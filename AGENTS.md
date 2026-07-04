@@ -3,3 +3,38 @@
 
 This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` before writing any code. Heed deprecation notices.
 <!-- END:nextjs-agent-rules -->
+
+# Macro tracker
+
+Macroeconomic dashboard: FRED data in, Dalio/Buffett metrics vs historical
+percentiles out. See README.md for setup and architecture.
+
+## Commands
+
+- `npm run dev` — dev server (needs `npx prisma dev -n macro-tracker` running)
+- `npm run build` / `npm run lint`
+- `npm run backfill` — full FRED history (needs FRED_API_KEY)
+- `npm run seed:demo` — synthetic demo data, no key needed
+- `npm run db:wipe` — clear all ingested data
+- `npx prisma generate` — after schema changes (client output: src/generated/prisma)
+
+## Hard constraints
+
+- **Database operation budget**: free Prisma Postgres = 100K queries/month.
+  Never write per-row loops against the DB — batch with `createMany` or
+  multi-row `INSERT ... ON CONFLICT` (see `upsertObservations`). Keep the
+  dashboard on ISR (`revalidate`) so page views don't query the DB.
+- Local `prisma dev` (PGlite) breaks `migrate dev`/`migrate deploy`
+  ("prepared statement s3 already exists"). Use `prisma db push` for local
+  iteration and `prisma migrate diff --script` to record migrations
+  (README "Local migration note"). Hosted Prisma Postgres is unaffected.
+- Prisma 7: client connects via `accelerateUrl` for `prisma+postgres://` URLs,
+  `@prisma/adapter-pg` otherwise — handled in `src/lib/db.ts`; don't
+  instantiate PrismaClient elsewhere.
+
+## Conventions
+
+- Metrics/series are config in `src/lib/metrics.ts`; transforms in
+  `src/lib/stats.ts`. Adding a metric = config entry only.
+- Observation values are `Float` on purpose (analytics, not accounting).
+- Server components only so far; no client JS on the dashboard.

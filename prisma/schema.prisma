@@ -1,0 +1,56 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// One row per FRED series we track. Small surrogate key keeps the
+// observations table + index compact (the whole DB must fit in 500MB).
+model Series {
+  id           Int           @id @default(autoincrement()) @db.SmallInt
+  code         String        @unique // FRED series id, e.g. "GFDEGDQ188S"
+  name         String
+  frequency    String // stored frequency after FRED-side aggregation: "m" | "q"
+  units        String
+  observations Observation[]
+
+  @@map("series")
+}
+
+// Raw observations as ingested from FRED. Analytical data, not money
+// movement, so double precision is fine.
+model Observation {
+  seriesId Int      @map("series_id") @db.SmallInt
+  date     DateTime @db.Date
+  value    Float
+  series   Series   @relation(fields: [seriesId], references: [id])
+
+  @@id([seriesId, date])
+  @@map("observations")
+}
+
+// Derived metric time series (transforms of one or two raw series),
+// fully recomputed after each ingest.
+model MetricPoint {
+  metricKey String   @map("metric_key")
+  date      DateTime @db.Date
+  value     Float
+
+  @@id([metricKey, date])
+  @@map("metric_points")
+}
+
+model IngestRun {
+  id           Int       @id @default(autoincrement())
+  startedAt    DateTime  @default(now()) @map("started_at")
+  finishedAt   DateTime? @map("finished_at")
+  status       String // "running" | "ok" | "error"
+  seriesCount  Int       @default(0) @map("series_count")
+  rowsUpserted Int       @default(0) @map("rows_upserted")
+  error        String?
+
+  @@map("ingest_runs")
+}
