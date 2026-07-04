@@ -2,13 +2,16 @@ import { prisma } from "@/lib/db";
 import { Prisma } from "@/generated/prisma/client";
 import { fetchFredSeries, type SeriesPoint } from "@/lib/fred";
 import { METRICS, SERIES } from "@/lib/metrics";
+import { computePortfolio, QUADRANTS } from "@/lib/portfolio";
 import { applyTransform } from "@/lib/stats";
+import { fetchStooqMonthly } from "@/lib/stooq";
 
 export type IngestResult = {
   status: "ok" | "error";
   seriesCount: number;
   rowsUpserted: number;
   metricsComputed: number;
+  portfolioComputed: boolean;
   durationMs: number;
   errors: string[];
 };
@@ -68,7 +71,12 @@ export async function ensureSeries(): Promise<Map<string, number>> {
 // Rebuild every derived metric from raw observations. All raw data is
 // loaded in a single query (the full table is ~20k rows), transforms run
 // in memory, and each metric is written back as delete + createMany.
-export async function recomputeMetrics(): Promise<number> {
+// Returns the computed series so downstream steps (portfolio engine)
+// don't need to re-read them.
+export async function recomputeMetrics(): Promise<{
+  computed: number;
+  metricSeries: Map<string, SeriesPoint[]>;
+}> {
   const seriesMeta = await prisma.series.findMany({ select: { id: true, code: true } });
   const codeById = new Map(seriesMeta.map((s) => [s.id, s.code]));
 
@@ -86,20 +94,47 @@ export async function recomputeMetrics(): Promise<number> {
   }
 
   let computed = 0;
+  const metricSeries = new Map<string, SeriesPoint[]>();
   for (const metric of METRICS) {
     const points = applyTransform(metric.transform, seriesByCode);
     if (points.length === 0) continue;
-    await prisma.metricPoint.deleteMany({ where: { metricKey: metric.key } });
-    await prisma.metricPoint.createMany({
-      data: points.map((p) => ({
-        metricKey: metric.key,
-        date: new Date(`${p.date}T00:00:00Z`),
-        value: p.value,
-      })),
-    });
+    metricSeries.set(metric.key, points);
+    await replaceMetricPoints(metric.key, points);
     computed++;
   }
-  return computed;
+  return { computed, metricSeries };
+}
+
+async function replaceMetricPoints(metricKey: string, points: SeriesPoint[]) {
+  await prisma.metricPoint.deleteMany({ where: { metricKey } });
+  await prisma.metricPoint.createMany({
+    data: points.map((p) => ({
+      metricKey,
+      date: new Date(`${p.date}T00:00:00Z`),
+      value: p.value,
+    })),
+  });
+}
+
+// Run the regime/tilt engine and persist its outputs: quadrant-probability
+// history as regime_* metric points (chartable later), plus the suggested
+// weights for the latest month in the allocations log.
+export async function persistPortfolio(
+  metricSeries: Map<string, SeriesPoint[]>,
+): Promise<boolean> {
+  const result = computePortfolio(metricSeries);
+  if (!result) return false;
+
+  for (const q of QUADRANTS) {
+    await replaceMetricPoints(`regime_${q.key}`, result.regimeHistory[q.key]);
+  }
+
+  const date = new Date(`${result.asOf}T00:00:00Z`);
+  await prisma.allocation.deleteMany({ where: { date } });
+  await prisma.allocation.createMany({
+    data: result.weights.map((w) => ({ date, asset: w.key, weight: w.weight })),
+  });
+  return true;
 }
 
 function isoDaysAgo(days: number): string {
@@ -119,10 +154,15 @@ export async function runIngest({ full = false }: { full?: boolean } = {}): Prom
 
   for (const def of SERIES) {
     try {
-      const points = await fetchFredSeries(def.code, {
-        aggregateMonthly: def.aggregateMonthly,
-        observationStart,
-      });
+      // Stooq CSVs are one small request for full history, so no
+      // incremental window is needed there.
+      const points =
+        def.source === "stooq"
+          ? await fetchStooqMonthly(def.code)
+          : await fetchFredSeries(def.code, {
+              aggregateMonthly: def.aggregateMonthly,
+              observationStart,
+            });
       const seriesId = idByCode.get(def.code);
       if (seriesId === undefined) throw new Error(`series row missing for ${def.code}`);
       rowsUpserted += await upsertObservations(seriesId, points);
@@ -134,7 +174,13 @@ export async function runIngest({ full = false }: { full?: boolean } = {}): Prom
     }
   }
 
-  const metricsComputed = seriesCount > 0 ? await recomputeMetrics() : 0;
+  let metricsComputed = 0;
+  let portfolioComputed = false;
+  if (seriesCount > 0) {
+    const { computed, metricSeries } = await recomputeMetrics();
+    metricsComputed = computed;
+    portfolioComputed = await persistPortfolio(metricSeries);
+  }
   const status: IngestResult["status"] = errors.length === 0 ? "ok" : "error";
 
   await prisma.ingestRun.create({
@@ -153,6 +199,7 @@ export async function runIngest({ full = false }: { full?: boolean } = {}): Prom
     seriesCount,
     rowsUpserted,
     metricsComputed,
+    portfolioComputed,
     durationMs: Date.now() - startedAt.getTime(),
     errors,
   };

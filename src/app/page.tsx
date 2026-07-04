@@ -1,4 +1,5 @@
 import { MetricCard } from "@/components/metric-card";
+import { PortfolioPanel } from "@/components/portfolio-panel";
 import { getDashboardData } from "@/lib/dashboard";
 import { formatDate } from "@/lib/format";
 import { PANELS } from "@/lib/metrics";
@@ -8,7 +9,7 @@ import { PANELS } from "@/lib/metrics";
 export const revalidate = 3600;
 
 export default async function Home() {
-  const { metrics, dataThrough, lastRun } = await getDashboardData();
+  const { metrics, portfolio, dataThrough, lastRun } = await getDashboardData();
 
   return (
     <div className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6">
@@ -31,27 +32,27 @@ export default async function Home() {
         )}
       </header>
 
-      {metrics.length === 0 ? (
-        <EmptyState />
-      ) : (
-        PANELS.map((panel) => {
-          const panelMetrics = metrics.filter((m) => m.panel === panel.id);
-          if (panelMetrics.length === 0) return null;
-          return (
-            <section key={panel.id} className="mb-10">
-              <div className="mb-3 flex items-baseline gap-2">
-                <h2 className="text-base font-medium">{panel.title}</h2>
-                <span className="text-sm text-neutral-500">{panel.subtitle}</span>
-              </div>
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-                {panelMetrics.map((m) => (
-                  <MetricCard key={m.key} metric={m} />
-                ))}
-              </div>
-            </section>
-          );
-        })
-      )}
+      {metrics.length === 0 && <EmptyState />}
+
+      {portfolio && <PortfolioPanel portfolio={portfolio} />}
+
+      {PANELS.map((panel) => {
+        const panelMetrics = metrics.filter((m) => m.panel === panel.id);
+        if (panelMetrics.length === 0) return null;
+        return (
+          <section key={panel.id} className="mb-10">
+            <div className="mb-3 flex items-baseline gap-2">
+              <h2 className="text-base font-medium">{panel.title}</h2>
+              <span className="text-sm text-neutral-500">{panel.subtitle}</span>
+            </div>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+              {panelMetrics.map((m) => (
+                <MetricCard key={m.key} metric={m} />
+              ))}
+            </div>
+          </section>
+        );
+      })}
 
       <footer className="mt-4 border-t border-neutral-200 pt-4 text-xs text-neutral-500 dark:border-neutral-800">
         Sources: FRED (St. Louis Fed). Percentiles are computed against each

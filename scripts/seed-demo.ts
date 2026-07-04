@@ -1,6 +1,6 @@
 import "dotenv/config";
 import type { SeriesPoint } from "../src/lib/fred";
-import { ensureSeries, recomputeMetrics, upsertObservations } from "../src/lib/ingest";
+import { ensureSeries, persistPortfolio, recomputeMetrics, upsertObservations } from "../src/lib/ingest";
 import { SERIES } from "../src/lib/metrics";
 
 // Seeds SYNTHETIC data so the dashboard renders without a FRED key.
@@ -33,7 +33,17 @@ const DEMO: Record<string, DemoParams> = {
   MORTGAGE30US: { kind: "rate", start: 1971, initial: 7.5, mean: 7.5, reversion: 0.01, vol: 0.26, floor: 2.6 },
   CSUSHPINSA: { kind: "level", start: 1987, initial: 64, driftPct: 0.38, volPct: 0.55 },
   UMCSENT: { kind: "rate", start: 1978, initial: 85, mean: 87, reversion: 0.03, vol: 2.6, floor: 50 },
+  INDPRO: { kind: "level", start: 1948, initial: 14, driftPct: 0.2, volPct: 0.8 },
+  PAYEMS: { kind: "level", start: 1948, initial: 44_000, driftPct: 0.15, volPct: 0.25 },
+  T10YIE: { kind: "rate", start: 2003, initial: 2.4, mean: 2.2, reversion: 0.03, vol: 0.12, floor: 0 },
   USREC: { kind: "binary", start: 1948 },
+  "VTI.US": { kind: "level", start: 2001, initial: 50, driftPct: 0.6, volPct: 4.2 },
+  "TLT.US": { kind: "level", start: 2002, initial: 85, driftPct: 0.15, volPct: 3.4 },
+  "IEF.US": { kind: "level", start: 2002, initial: 80, driftPct: 0.1, volPct: 1.8 },
+  "SCHP.US": { kind: "level", start: 2010, initial: 50, driftPct: 0.1, volPct: 1.2 },
+  "GLD.US": { kind: "level", start: 2004, initial: 45, driftPct: 0.5, volPct: 4.5 },
+  "PDBC.US": { kind: "level", start: 2014, initial: 20, driftPct: 0.1, volPct: 4.5 },
+  "BIL.US": { kind: "level", start: 2007, initial: 45.7, driftPct: 0.02, volPct: 0.05 },
 };
 
 // Deterministic RNG so re-runs produce identical data.
@@ -100,8 +110,12 @@ async function main() {
     const points = generate(def.code, params, def.frequency === "q" ? 3 : 1, rand);
     rows += await upsertObservations(id, points);
   }
-  const metrics = await recomputeMetrics();
-  console.log(`Seeded ${rows} observations across ${SERIES.length} series; ${metrics} metrics computed.`);
+  const { computed, metricSeries } = await recomputeMetrics();
+  const portfolio = await persistPortfolio(metricSeries);
+  console.log(
+    `Seeded ${rows} observations across ${SERIES.length} series; ${computed} metrics computed; ` +
+      `portfolio ${portfolio ? "computed" : "skipped (insufficient data)"}.`,
+  );
   process.exit(0);
 }
 

@@ -1,5 +1,7 @@
 import { prisma } from "@/lib/db";
+import type { SeriesPoint } from "@/lib/fred";
 import { METRICS, type MetricDef } from "@/lib/metrics";
+import { computePortfolio, type PortfolioResult } from "@/lib/portfolio";
 import { median, percentileRank, zScore } from "@/lib/stats";
 
 export type MetricView = Omit<MetricDef, "transform"> & {
@@ -14,8 +16,11 @@ export type MetricView = Omit<MetricDef, "transform"> & {
   sparkStartYear: number;
 };
 
+export type PortfolioView = Omit<PortfolioResult, "regimeHistory">;
+
 export type DashboardData = {
   metrics: MetricView[];
+  portfolio: PortfolioView | null;
   dataThrough: string | null;
   lastRun: { finishedAt: string | null; status: string } | null;
 };
@@ -79,8 +84,26 @@ export async function getDashboardData(): Promise<DashboardData> {
     ? metrics.map((m) => m.latest.date).sort().at(-1)!
     : null;
 
+  // Recompute the portfolio live from the same metric points (identical
+  // math to what ingest persisted) so the panel always matches the data.
+  const metricSeries = new Map<string, SeriesPoint[]>();
+  for (const [key, hist] of byKey) {
+    metricSeries.set(
+      key,
+      hist.map((h) => ({ date: h.date.toISOString().slice(0, 10), value: h.value })),
+    );
+  }
+  const full = computePortfolio(metricSeries);
+  let portfolio: PortfolioView | null = null;
+  if (full) {
+    const { regimeHistory: _history, ...view } = full;
+    void _history;
+    portfolio = view;
+  }
+
   return {
     metrics,
+    portfolio,
     dataThrough,
     lastRun: lastRun
       ? { finishedAt: lastRun.finishedAt?.toISOString() ?? null, status: lastRun.status }

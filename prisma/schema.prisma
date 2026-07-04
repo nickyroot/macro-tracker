@@ -43,6 +43,17 @@ model MetricPoint {
   @@map("metric_points")
 }
 
+// Forward log of the portfolio engine's suggested weights, one row per
+// asset per month — the model's own track record vs the static baseline.
+model Allocation {
+  date   DateTime @db.Date
+  asset  String
+  weight Float
+
+  @@id([date, asset])
+  @@map("allocations")
+}
+
 model IngestRun {
   id           Int       @id @default(autoincrement())
   startedAt    DateTime  @default(now()) @map("started_at")

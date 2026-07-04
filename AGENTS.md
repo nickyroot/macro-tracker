@@ -38,3 +38,15 @@ percentiles out. See README.md for setup and architecture.
   `src/lib/stats.ts`. Adding a metric = config entry only.
 - Observation values are `Float` on purpose (analytics, not accounting).
 - Server components only so far; no client JS on the dashboard.
+
+## Portfolio engine
+
+`src/lib/portfolio.ts` is deterministic config + math: signal defs → growth/
+inflation composite z-scores → sigmoid → quadrant probabilities → baseline +
+tilts + overlays → guardrails. It must stay explainable — every weight change
+needs a traceable signal; no opaque models in this layer (ML belongs in the
+phase-3 local jobs). It runs twice by design: persisted during ingest
+(regime_* metric points + allocations log) and recomputed live in
+`getDashboardData` — keep the math identical in both paths (it's the same
+function; don't fork it). Invariants: weights sum to 100, no negative
+weights, quadrant probs sum to 1, active share ≤ 20pp.

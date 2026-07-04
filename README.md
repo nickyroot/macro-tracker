@@ -12,6 +12,10 @@ full historical distribution (percentile rank, z-score, trend sparkline).
 - **Valuation & rates (Buffett)** — Buffett indicator (corporate equities/GDP,
   Z.1 based), corporate profits/GDP, 10y Treasury, 30y mortgage, home prices
   YoY, consumer sentiment.
+- **Suggested mix** — a dynamic All Weather model portfolio: quadrant regime
+  probabilities (growth × inflation direction) tilt a static All Weather
+  baseline, with Buffett-style valuation and real-rate overlays. Model
+  output for decision support, not investment advice.
 
 ## Stack
 
@@ -91,12 +95,37 @@ Postgres ──> / (ISR, revalidate 3600) ──> percentile cards + sparklines
 - Transforms + stats: `src/lib/stats.ts`. Ingest: `src/lib/ingest.ts`.
 - FRED revises history; each ingest refetches a 2-year window and the upsert
   overwrites revised values. `?full=1` refetches everything.
+- ETF closes (VTI/TLT/IEF/SCHP/GLD/PDBC/BIL) come from Stooq as monthly CSVs,
+  no key needed — `src/lib/stooq.ts`.
+
+### Portfolio engine (`src/lib/portfolio.ts`)
+
+Deterministic and fully explainable — every weight traces to a named signal:
+
+1. Growth and inflation composites: weighted z-scores of configured signals
+   (Sahm rule, payrolls YoY, yield curve, CPI momentum, breakevens, …).
+2. Sigmoid → P(growth rising), P(inflation rising) → four quadrant
+   probabilities (goldilocks / reflation / stagflation / deflationary bust),
+   smoothed over 3 months. Full monthly history is persisted as `regime_*`
+   metric points.
+3. Weights = All Weather baseline + Σ (quadrant prob × tilt vector)
+   + valuation overlay (Buffett indicator percentile, contrarian)
+   + real-rate overlay (real 10y percentile → duration), then guardrails:
+   no shorts, 20pp active-share cap, renormalize to 100%.
+4. Each month's suggested weights are logged to the `allocations` table —
+   the model's forward track record vs the static baseline.
+
+Caveats by design: the historical regime series uses full-sample z-scores
+(fine for charts, lookahead-biased for backtests — phase 3 uses ALFRED
+vintages), and tilt sizes are illustrative starting points to be validated
+by backtesting, not truths.
 
 ## Roadmap
 
 - **Phase 2** — Shiller CAPE (Yale data), Treasury FiscalData, recession
-  shading (USREC is already ingested), Dalio four-quadrant regime widget,
-  composite gauges.
+  shading (USREC is already ingested), regime-history chart from the stored
+  `regime_*` series, composite gauges.
 - **Phase 3** — local ML jobs (trained on your machine, results pushed back):
   recession probability (yield-curve probit), regime classification (HMM),
-  historical-analogue search.
+  historical-analogue search, covariance-based risk parity as the portfolio
+  baseline, and a vintage-correct (ALFRED) backtest of the tilt rules.

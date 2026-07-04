@@ -3,11 +3,12 @@
 // the ingest job and dashboard pick it up automatically.
 
 export type SeriesDef = {
-  code: string; // FRED series id
+  code: string; // FRED series id, or Stooq symbol (e.g. "VTI.US")
   name: string;
   units: string;
   frequency: "m" | "q"; // frequency as stored (after FRED-side aggregation)
   aggregateMonthly?: boolean; // average daily/weekly data to monthly at the API
+  source?: "fred" | "stooq"; // default fred
 };
 
 export type MetricTransform =
@@ -48,8 +49,22 @@ export const SERIES: SeriesDef[] = [
   { code: "MORTGAGE30US", name: "30y fixed mortgage rate", units: "%", frequency: "m", aggregateMonthly: true },
   { code: "CSUSHPINSA", name: "Case-Shiller national home price index", units: "index", frequency: "m" },
   { code: "UMCSENT", name: "Consumer sentiment (U. Michigan)", units: "index", frequency: "m" },
+  // — Regime-engine inputs (growth + inflation direction) —
+  { code: "INDPRO", name: "Industrial production index", units: "index", frequency: "m" },
+  { code: "PAYEMS", name: "Nonfarm payrolls", units: "thousands", frequency: "m" },
+  { code: "T10YIE", name: "10y breakeven inflation", units: "%", frequency: "m", aggregateMonthly: true },
   // Ingested now, used in phase 2 for recession shading on charts.
   { code: "USREC", name: "NBER recession indicator", units: "0/1", frequency: "m" },
+  // — Portfolio universe: monthly ETF closes from Stooq (no key needed).
+  // Not shown as dashboard cards; used for tracking the model portfolio
+  // and, later, covariance-based risk parity.
+  { code: "VTI.US", name: "Vanguard Total Stock Market ETF", units: "$", frequency: "m", source: "stooq" },
+  { code: "TLT.US", name: "iShares 20+ Year Treasury ETF", units: "$", frequency: "m", source: "stooq" },
+  { code: "IEF.US", name: "iShares 7-10 Year Treasury ETF", units: "$", frequency: "m", source: "stooq" },
+  { code: "SCHP.US", name: "Schwab US TIPS ETF", units: "$", frequency: "m", source: "stooq" },
+  { code: "GLD.US", name: "SPDR Gold Shares", units: "$", frequency: "m", source: "stooq" },
+  { code: "PDBC.US", name: "Invesco Commodity Strategy ETF", units: "$", frequency: "m", source: "stooq" },
+  { code: "BIL.US", name: "SPDR 1-3 Month T-Bill ETF", units: "$", frequency: "m", source: "stooq" },
 ];
 
 export const METRICS: MetricDef[] = [
@@ -131,6 +146,24 @@ export const METRICS: MetricDef[] = [
     unit: "%", decimals: 2,
     describe: "The short-term policy rate",
     transform: { type: "direct", series: "FEDFUNDS" },
+  },
+  {
+    key: "indpro_yoy", name: "Industrial production YoY", panel: "dalio",
+    unit: "%", decimals: 1,
+    describe: "Real-economy growth pulse",
+    transform: { type: "yoy", series: "INDPRO" },
+  },
+  {
+    key: "payems_yoy", name: "Payrolls YoY", panel: "dalio",
+    unit: "%", decimals: 1,
+    describe: "Employment growth",
+    transform: { type: "yoy", series: "PAYEMS" },
+  },
+  {
+    key: "breakeven_10y", name: "10y inflation breakeven", panel: "dalio",
+    unit: "%", decimals: 2,
+    describe: "The bond market's own inflation forecast",
+    transform: { type: "direct", series: "T10YIE" },
   },
   // — Buffett: what you pay vs what you get —
   {
