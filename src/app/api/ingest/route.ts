@@ -3,7 +3,9 @@ import type { NextRequest } from "next/server";
 import { runIngest } from "@/lib/ingest";
 
 export const dynamic = "force-dynamic";
-export const maxDuration = 60;
+// The daily incremental run takes ~30s; a ?full=1 backfill can exceed 60s,
+// and fluid compute allows up to 300s on the Hobby plan.
+export const maxDuration = 300;
 
 // Hit daily by Vercel Cron (see vercel.json). Vercel sends
 // `Authorization: Bearer $CRON_SECRET` automatically when the env var is set.

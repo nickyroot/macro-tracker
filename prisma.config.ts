@@ -12,6 +12,6 @@ export default defineConfig({
     url: process.env["DATABASE_URL"],
     // Local `prisma dev` serves a shadow database on a second port;
     // hosted Prisma Postgres doesn't need this.
-    shadowDatabaseUrl: process.env["SHADOW_DATABASE_URL"],
+    shadowDatabaseUrl: process.env["SHADOW_DATABASE_URL"] || undefined,
   },
 });
