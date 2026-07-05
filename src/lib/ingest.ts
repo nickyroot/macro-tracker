@@ -4,7 +4,7 @@ import { fetchFredSeries, type SeriesPoint } from "@/lib/fred";
 import { METRICS, SERIES } from "@/lib/metrics";
 import { computePortfolio, QUADRANTS } from "@/lib/portfolio";
 import { applyTransform } from "@/lib/stats";
-import { fetchStooqMonthly } from "@/lib/stooq";
+import { fetchYahooMonthly } from "@/lib/yahoo";
 
 export type IngestResult = {
   status: "ok" | "error";
@@ -154,11 +154,11 @@ export async function runIngest({ full = false }: { full?: boolean } = {}): Prom
 
   for (const def of SERIES) {
     try {
-      // Stooq CSVs are one small request for full history, so no
+      // Yahoo returns full history in one small request, so no
       // incremental window is needed there.
       const points =
-        def.source === "stooq"
-          ? await fetchStooqMonthly(def.code)
+        def.source === "yahoo"
+          ? await fetchYahooMonthly(def.code)
           : await fetchFredSeries(def.code, {
               aggregateMonthly: def.aggregateMonthly,
               observationStart,

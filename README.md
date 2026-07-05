@@ -95,8 +95,8 @@ Postgres ──> / (ISR, revalidate 3600) ──> percentile cards + sparklines
 - Transforms + stats: `src/lib/stats.ts`. Ingest: `src/lib/ingest.ts`.
 - FRED revises history; each ingest refetches a 2-year window and the upsert
   overwrites revised values. `?full=1` refetches everything.
-- ETF closes (VTI/TLT/IEF/SCHP/GLD/PDBC/BIL) come from Stooq as monthly CSVs,
-  no key needed — `src/lib/stooq.ts`.
+- ETF closes (VTI/TLT/IEF/SCHP/GLD/PDBC/BIL) come from Yahoo Finance's public
+  chart API as adjusted monthly closes, no key needed — `src/lib/yahoo.ts`.
 
 ### Portfolio engine (`src/lib/portfolio.ts`)
 

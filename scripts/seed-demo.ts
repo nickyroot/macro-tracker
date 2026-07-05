@@ -37,13 +37,13 @@ const DEMO: Record<string, DemoParams> = {
   PAYEMS: { kind: "level", start: 1948, initial: 44_000, driftPct: 0.15, volPct: 0.25 },
   T10YIE: { kind: "rate", start: 2003, initial: 2.4, mean: 2.2, reversion: 0.03, vol: 0.12, floor: 0 },
   USREC: { kind: "binary", start: 1948 },
-  "VTI.US": { kind: "level", start: 2001, initial: 50, driftPct: 0.6, volPct: 4.2 },
-  "TLT.US": { kind: "level", start: 2002, initial: 85, driftPct: 0.15, volPct: 3.4 },
-  "IEF.US": { kind: "level", start: 2002, initial: 80, driftPct: 0.1, volPct: 1.8 },
-  "SCHP.US": { kind: "level", start: 2010, initial: 50, driftPct: 0.1, volPct: 1.2 },
-  "GLD.US": { kind: "level", start: 2004, initial: 45, driftPct: 0.5, volPct: 4.5 },
-  "PDBC.US": { kind: "level", start: 2014, initial: 20, driftPct: 0.1, volPct: 4.5 },
-  "BIL.US": { kind: "level", start: 2007, initial: 45.7, driftPct: 0.02, volPct: 0.05 },
+  "VTI": { kind: "level", start: 2001, initial: 50, driftPct: 0.6, volPct: 4.2 },
+  "TLT": { kind: "level", start: 2002, initial: 85, driftPct: 0.15, volPct: 3.4 },
+  "IEF": { kind: "level", start: 2002, initial: 80, driftPct: 0.1, volPct: 1.8 },
+  "SCHP": { kind: "level", start: 2010, initial: 50, driftPct: 0.1, volPct: 1.2 },
+  "GLD": { kind: "level", start: 2004, initial: 45, driftPct: 0.5, volPct: 4.5 },
+  "PDBC": { kind: "level", start: 2014, initial: 20, driftPct: 0.1, volPct: 4.5 },
+  "BIL": { kind: "level", start: 2007, initial: 45.7, driftPct: 0.02, volPct: 0.05 },
 };
 
 // Deterministic RNG so re-runs produce identical data.
