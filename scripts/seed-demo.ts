@@ -5,7 +5,7 @@ import { SERIES } from "../src/lib/metrics";
 
 // Seeds SYNTHETIC data so the dashboard renders without a FRED key.
 // Shapes are plausible, values are fake. Wipe before loading real data:
-//   npx prisma migrate reset && npm run backfill
+//   npm run db:wipe && npm run backfill
 
 type DemoParams =
   | { kind: "level"; start: number; initial: number; driftPct: number; volPct: number }
