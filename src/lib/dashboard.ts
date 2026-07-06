@@ -19,9 +19,20 @@ export type MetricView = Omit<MetricDef, "transform"> & {
 
 export type PortfolioView = Omit<PortfolioResult, "regimeHistory">;
 
+export type TrackStats = { cagr: number; totalReturn: number; maxDrawdown: number };
+export type TrackRecordView = {
+  startYear: number;
+  months: number;
+  dynamic: TrackStats;
+  static: TrackStats;
+  excessCagr: number;
+  points: { dynamic: TimelinePoint[]; static: TimelinePoint[] };
+};
+
 export type DashboardData = {
   metrics: MetricView[];
   portfolio: PortfolioView | null;
+  trackRecord: TrackRecordView | null;
   timeline: TimelineData;
   dataThrough: string | null;
   lastRun: { finishedAt: string | null; status: string } | null;
@@ -31,6 +42,45 @@ const SPARK_MAX_POINTS = 120;
 const SPARK_HISTORY_POINTS = 300; // ~25y of monthly data
 
 const round4 = (v: number) => Math.round(v * 10000) / 10000;
+
+// Cumulative-growth stats from an index series that starts at 100.
+function trackStats(series: { date: Date; value: number }[]): TrackStats {
+  const months = series.length - 1;
+  const last = series[series.length - 1].value;
+  let peak = -Infinity;
+  let maxDrawdown = 0;
+  for (const p of series) {
+    peak = Math.max(peak, p.value);
+    maxDrawdown = Math.min(maxDrawdown, p.value / peak - 1);
+  }
+  return {
+    totalReturn: last / 100 - 1,
+    cagr: (last / 100) ** (12 / months) - 1,
+    maxDrawdown,
+  };
+}
+
+function buildTrackRecord(
+  byKey: Map<string, { date: Date; value: number }[]>,
+): TrackRecordView | null {
+  const dyn = byKey.get("track_dynamic");
+  const sta = byKey.get("track_static");
+  if (!dyn || !sta || dyn.length < 13 || sta.length < 13) return null;
+
+  const dynamic = trackStats(dyn);
+  const staticStats = trackStats(sta);
+  return {
+    startYear: dyn[0].date.getUTCFullYear(),
+    months: dyn.length - 1,
+    dynamic,
+    static: staticStats,
+    excessCagr: dynamic.cagr - staticStats.cagr,
+    points: {
+      dynamic: dyn.map((p) => [monthIdxFromDate(p.date), round4(p.value)]),
+      static: sta.map((p) => [monthIdxFromDate(p.date), round4(p.value)]),
+    },
+  };
+}
 
 // Full monthly history for the master timeline, as compact [monthIdx, value]
 // pairs (~15k pairs total — fine for a static, ISR-cached page).
@@ -149,6 +199,7 @@ export async function getDashboardData(): Promise<DashboardData> {
   return {
     metrics,
     portfolio,
+    trackRecord: buildTrackRecord(byKey),
     timeline: buildTimeline(byKey),
     dataThrough,
     lastRun: lastRun

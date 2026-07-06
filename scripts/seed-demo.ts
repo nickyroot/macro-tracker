@@ -111,8 +111,8 @@ async function main() {
     const points = generate(def.code, params, def.frequency === "q" ? 3 : 1, rand);
     rows += await upsertObservations(id, points);
   }
-  const { computed, metricSeries } = await recomputeMetrics();
-  const portfolio = await persistPortfolio(metricSeries);
+  const { computed, metricSeries, rawByCode } = await recomputeMetrics();
+  const portfolio = await persistPortfolio(metricSeries, rawByCode);
   console.log(
     `Seeded ${rows} observations across ${SERIES.length} series; ${computed} metrics computed; ` +
       `portfolio ${portfolio ? "computed" : "skipped (insufficient data)"}.`,

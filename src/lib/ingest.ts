@@ -2,7 +2,7 @@ import { prisma } from "@/lib/db";
 import { Prisma } from "@/generated/prisma/client";
 import { fetchFredSeries, type SeriesPoint } from "@/lib/fred";
 import { METRICS, SERIES } from "@/lib/metrics";
-import { computePortfolio, QUADRANTS } from "@/lib/portfolio";
+import { computePortfolio, computeTrackRecord, QUADRANTS } from "@/lib/portfolio";
 import { fetchMultplCape } from "@/lib/multpl";
 import { applyTransform } from "@/lib/stats";
 import { fetchYahooMonthly } from "@/lib/yahoo";
@@ -77,6 +77,7 @@ export async function ensureSeries(): Promise<Map<string, number>> {
 export async function recomputeMetrics(): Promise<{
   computed: number;
   metricSeries: Map<string, SeriesPoint[]>;
+  rawByCode: Map<string, SeriesPoint[]>;
 }> {
   const seriesMeta = await prisma.series.findMany({ select: { id: true, code: true } });
   const codeById = new Map(seriesMeta.map((s) => [s.id, s.code]));
@@ -103,7 +104,7 @@ export async function recomputeMetrics(): Promise<{
     await replaceMetricPoints(metric.key, points);
     computed++;
   }
-  return { computed, metricSeries };
+  return { computed, metricSeries, rawByCode: seriesByCode };
 }
 
 async function replaceMetricPoints(metricKey: string, points: SeriesPoint[]) {
@@ -122,12 +123,21 @@ async function replaceMetricPoints(metricKey: string, points: SeriesPoint[]) {
 // weights for the latest month in the allocations log.
 export async function persistPortfolio(
   metricSeries: Map<string, SeriesPoint[]>,
+  rawByCode: Map<string, SeriesPoint[]>,
 ): Promise<boolean> {
   const result = computePortfolio(metricSeries);
   if (!result) return false;
 
   for (const q of QUADRANTS) {
     await replaceMetricPoints(`regime_${q.key}`, result.regimeHistory[q.key]);
+  }
+
+  // Historical track record: dynamic mix vs static baseline, stored as two
+  // cumulative-index series for the dashboard to read directly.
+  const track = computeTrackRecord(result.regimeHistory, rawByCode);
+  if (track) {
+    await replaceMetricPoints("track_dynamic", track.dynamic);
+    await replaceMetricPoints("track_static", track.static);
   }
 
   const date = new Date(`${result.asOf}T00:00:00Z`);
@@ -179,9 +189,9 @@ export async function runIngest({ full = false }: { full?: boolean } = {}): Prom
   let metricsComputed = 0;
   let portfolioComputed = false;
   if (seriesCount > 0) {
-    const { computed, metricSeries } = await recomputeMetrics();
+    const { computed, metricSeries, rawByCode } = await recomputeMetrics();
     metricsComputed = computed;
-    portfolioComputed = await persistPortfolio(metricSeries);
+    portfolioComputed = await persistPortfolio(metricSeries, rawByCode);
   }
   const status: IngestResult["status"] = errors.length === 0 ? "ok" : "error";
 

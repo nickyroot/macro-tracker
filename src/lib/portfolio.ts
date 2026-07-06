@@ -196,6 +196,35 @@ function latestPercentile(points: SeriesPoint[] | undefined): number | null {
   return percentileRank(values, values[values.length - 1]);
 }
 
+function baselineWeights(): Record<AssetKey, number> {
+  return Object.fromEntries(ASSETS.map((a) => [a.key, a.baseline])) as Record<AssetKey, number>;
+}
+
+// Baseline + probability-weighted quadrant tilts (before overlays/guardrails).
+function applyQuadrantTilts(probs: Record<QuadrantKey, number>): Record<AssetKey, number> {
+  const w = baselineWeights();
+  for (const q of QUADRANTS) {
+    for (const [asset, tilt] of Object.entries(TILTS[q.key])) {
+      w[asset as AssetKey] += probs[q.key] * tilt;
+    }
+  }
+  return w;
+}
+
+// Guardrails, in place: no shorts, cap total active share at the tilt budget,
+// renormalize to 100. Returns the resulting active share.
+function guardrail(w: Record<AssetKey, number>): number {
+  for (const a of ASSETS) w[a.key] = Math.max(0, w[a.key]);
+  const activeShare = ASSETS.reduce((s, a) => s + Math.abs(w[a.key] - a.baseline), 0) / 2;
+  if (activeShare > ACTIVE_SHARE_CAP) {
+    const scale = ACTIVE_SHARE_CAP / activeShare;
+    for (const a of ASSETS) w[a.key] = a.baseline + (w[a.key] - a.baseline) * scale;
+  }
+  const total = ASSETS.reduce((s, a) => s + w[a.key], 0);
+  for (const a of ASSETS) w[a.key] = (w[a.key] / total) * 100;
+  return ASSETS.reduce((s, a) => s + Math.abs(w[a.key] - a.baseline), 0) / 2;
+}
+
 export function computePortfolio(
   seriesByKey: Map<string, SeriesPoint[]>,
 ): PortfolioResult | null {
@@ -227,14 +256,7 @@ export function computePortfolio(
   const asOf = idxToDate(commonIdx[commonIdx.length - 1]);
 
   // Baseline + probability-weighted quadrant tilts.
-  const w: Record<AssetKey, number> = Object.fromEntries(
-    ASSETS.map((a) => [a.key, a.baseline]),
-  ) as Record<AssetKey, number>;
-  for (const q of QUADRANTS) {
-    for (const [asset, tilt] of Object.entries(TILTS[q.key])) {
-      w[asset as AssetKey] += probs[q.key] * tilt;
-    }
-  }
+  const w = applyQuadrantTilts(probs);
 
   const notes: string[] = [];
   const dominant = [...QUADRANTS].sort((a, b) => probs[b.key] - probs[a.key])[0];
@@ -278,15 +300,7 @@ export function computePortfolio(
   }
 
   // Guardrails: no shorts; cap total active share; renormalize to 100.
-  for (const a of ASSETS) w[a.key] = Math.max(0, w[a.key]);
-  let activeShare = ASSETS.reduce((s, a) => s + Math.abs(w[a.key] - a.baseline), 0) / 2;
-  if (activeShare > ACTIVE_SHARE_CAP) {
-    const scale = ACTIVE_SHARE_CAP / activeShare;
-    for (const a of ASSETS) w[a.key] = a.baseline + (w[a.key] - a.baseline) * scale;
-  }
-  const total = ASSETS.reduce((s, a) => s + w[a.key], 0);
-  for (const a of ASSETS) w[a.key] = (w[a.key] / total) * 100;
-  activeShare = ASSETS.reduce((s, a) => s + Math.abs(w[a.key] - a.baseline), 0) / 2;
+  const activeShare = guardrail(w);
 
   return {
     asOf,
@@ -305,4 +319,81 @@ export function computePortfolio(
     notes,
     regimeHistory,
   };
+}
+
+export type TrackRecord = {
+  dynamic: SeriesPoint[]; // cumulative growth index (start 100)
+  static: SeriesPoint[];
+};
+
+// Reconstruct the model's historical track record from the stored regime
+// probabilities and ETF prices. For each month, the dynamic weights are the
+// deterministic quadrant tilts applied to that month's regime probabilities
+// (the valuation/real-rate overlays are NOT replayed — they need
+// point-in-time percentiles, which belongs in the phase-3 backtest). Both
+// portfolios are rebalanced monthly on adjusted closes over the window where
+// every ETF has prices. This reuses full-sample regime z-scores, so it is
+// illustrative, not a lookahead-free backtest.
+export function computeTrackRecord(
+  regimeHistory: Record<QuadrantKey, SeriesPoint[]>,
+  etfPrices: Map<string, SeriesPoint[]>,
+): TrackRecord | null {
+  const probsByDate = new Map<string, Record<QuadrantKey, number>>();
+  for (const q of QUADRANTS) {
+    for (const p of regimeHistory[q.key]) {
+      const r = probsByDate.get(p.date) ?? { goldilocks: 0, reflation: 0, stagflation: 0, bust: 0 };
+      r[q.key] = p.value;
+      probsByDate.set(p.date, r);
+    }
+  }
+
+  // Price lookup per asset, and the set of dates where every ETF has a price.
+  const priceByAsset = new Map<AssetKey, Map<string, number>>();
+  for (const a of ASSETS) {
+    const pts = etfPrices.get(a.etf);
+    if (!pts || pts.length === 0) return null;
+    priceByAsset.set(a.key, new Map(pts.map((p) => [p.date, p.value])));
+  }
+  const firstAsset = priceByAsset.get(ASSETS[0].key)!;
+  const dates = [...firstAsset.keys()]
+    .filter((d) => ASSETS.every((a) => priceByAsset.get(a.key)!.has(d)))
+    .sort();
+  if (dates.length < 13) return null; // need at least a year
+
+  const baseFrac = Object.fromEntries(ASSETS.map((a) => [a.key, a.baseline / 100])) as Record<AssetKey, number>;
+
+  let dynIdx = 100;
+  let staIdx = 100;
+  const dynamic: SeriesPoint[] = [{ date: dates[0], value: 100 }];
+  const staticSeries: SeriesPoint[] = [{ date: dates[0], value: 100 }];
+
+  for (let i = 1; i < dates.length; i++) {
+    const d0 = dates[i - 1];
+    const d1 = dates[i];
+    // Weights held over the month are set at its start (d0).
+    const probs = probsByDate.get(d0);
+    let dynFrac: Record<AssetKey, number>;
+    if (probs) {
+      const w = applyQuadrantTilts(probs);
+      guardrail(w); // mutates to percent weights summing to 100
+      dynFrac = Object.fromEntries(ASSETS.map((a) => [a.key, w[a.key] / 100])) as Record<AssetKey, number>;
+    } else {
+      dynFrac = baseFrac;
+    }
+    let dynR = 0;
+    let staR = 0;
+    for (const a of ASSETS) {
+      const p0 = priceByAsset.get(a.key)!.get(d0)!;
+      const p1 = priceByAsset.get(a.key)!.get(d1)!;
+      const ret = p1 / p0 - 1;
+      dynR += dynFrac[a.key] * ret;
+      staR += baseFrac[a.key] * ret;
+    }
+    dynIdx *= 1 + dynR;
+    staIdx *= 1 + staR;
+    dynamic.push({ date: d1, value: dynIdx });
+    staticSeries.push({ date: d1, value: staIdx });
+  }
+
+  return { dynamic, static: staticSeries };
 }
