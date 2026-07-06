@@ -16,6 +16,10 @@ full historical distribution (percentile rank, z-score, trend sparkline).
   probabilities (growth × inflation direction) tilt a static All Weather
   baseline, with Buffett-style valuation and real-rate overlays. Model
   output for decision support, not investment advice.
+- **Master timeline** — any metric's full history on one large chart
+  (median + 10–90th percentile context, NBER recession shading) with the
+  regime-probability stack on the same time axis. Click a metric card to
+  load it.
 
 ## Stack
 
@@ -122,9 +126,8 @@ by backtesting, not truths.
 
 ## Roadmap
 
-- **Phase 2** — Shiller CAPE (Yale data), Treasury FiscalData, recession
-  shading (USREC is already ingested), regime-history chart from the stored
-  `regime_*` series, composite gauges.
+- **Phase 2 (remaining)** — Shiller CAPE (Yale data), Treasury FiscalData,
+  allocation track-record view, composite gauges.
 - **Phase 3** — local ML jobs (trained on your machine, results pushed back):
   recession probability (yield-curve probit), regime classification (HMM),
   historical-analogue search, covariance-based risk parity as the portfolio

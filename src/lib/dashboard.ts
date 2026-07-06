@@ -1,8 +1,9 @@
 import { prisma } from "@/lib/db";
 import type { SeriesPoint } from "@/lib/fred";
 import { METRICS, type MetricDef } from "@/lib/metrics";
-import { computePortfolio, type PortfolioResult } from "@/lib/portfolio";
+import { computePortfolio, QUADRANTS, type PortfolioResult } from "@/lib/portfolio";
 import { median, percentileRank, zScore } from "@/lib/stats";
+import { monthIdxFromDate, type TimelineData, type TimelinePoint } from "@/lib/timeline";
 
 export type MetricView = Omit<MetricDef, "transform"> & {
   latest: { date: string; value: number };
@@ -21,12 +22,54 @@ export type PortfolioView = Omit<PortfolioResult, "regimeHistory">;
 export type DashboardData = {
   metrics: MetricView[];
   portfolio: PortfolioView | null;
+  timeline: TimelineData;
   dataThrough: string | null;
   lastRun: { finishedAt: string | null; status: string } | null;
 };
 
 const SPARK_MAX_POINTS = 120;
 const SPARK_HISTORY_POINTS = 300; // ~25y of monthly data
+
+const round4 = (v: number) => Math.round(v * 10000) / 10000;
+
+// Full monthly history for the master timeline, as compact [monthIdx, value]
+// pairs (~15k pairs total — fine for a static, ISR-cached page).
+function buildTimeline(byKey: Map<string, { date: Date; value: number }[]>): TimelineData {
+  const toPoints = (hist: { date: Date; value: number }[] | undefined): TimelinePoint[] =>
+    (hist ?? []).map((h) => [monthIdxFromDate(h.date), round4(h.value)]);
+
+  // Consecutive months where USREC >= 0.5 collapse into [start, end] spans.
+  const recessions: [number, number][] = [];
+  for (const p of byKey.get("usrec") ?? []) {
+    if (p.value < 0.5) continue;
+    const idx = monthIdxFromDate(p.date);
+    const last = recessions[recessions.length - 1];
+    if (last && idx <= last[1] + 1) last[1] = idx;
+    else recessions.push([idx, idx]);
+  }
+
+  return {
+    metrics: METRICS.flatMap((def) => {
+      if (def.panel === "internal") return [];
+      const points = toPoints(byKey.get(def.key));
+      if (points.length < 2) return [];
+      return [{
+        key: def.key,
+        name: def.name,
+        panel: def.panel,
+        unit: def.unit,
+        decimals: def.decimals,
+        points,
+      }];
+    }),
+    regimes: QUADRANTS.map((q) => ({
+      key: q.key,
+      name: q.name,
+      points: toPoints(byKey.get(`regime_${q.key}`)),
+    })),
+    recessions,
+  };
+}
 
 function downsample(values: number[], max: number): number[] {
   if (values.length <= max) return values;
@@ -56,6 +99,7 @@ export async function getDashboardData(): Promise<DashboardData> {
 
   const metrics: MetricView[] = [];
   for (const def of METRICS) {
+    if (def.panel === "internal") continue;
     const hist = byKey.get(def.key);
     if (!hist || hist.length === 0) continue;
     const values = hist.map((h) => h.value);
@@ -104,6 +148,7 @@ export async function getDashboardData(): Promise<DashboardData> {
   return {
     metrics,
     portfolio,
+    timeline: buildTimeline(byKey),
     dataThrough,
     lastRun: lastRun
       ? { finishedAt: lastRun.finishedAt?.toISOString() ?? null, status: lastRun.status }

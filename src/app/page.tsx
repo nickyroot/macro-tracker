@@ -1,5 +1,6 @@
 import { MetricCard } from "@/components/metric-card";
 import { PortfolioPanel } from "@/components/portfolio-panel";
+import { TimelinePanel } from "@/components/timeline-panel";
 import { getDashboardData } from "@/lib/dashboard";
 import { formatDate } from "@/lib/format";
 import { PANELS } from "@/lib/metrics";
@@ -9,7 +10,7 @@ import { PANELS } from "@/lib/metrics";
 export const revalidate = 3600;
 
 export default async function Home() {
-  const { metrics, portfolio, dataThrough, lastRun } = await getDashboardData();
+  const { metrics, portfolio, timeline, dataThrough, lastRun } = await getDashboardData();
 
   return (
     <div className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6">
@@ -35,6 +36,8 @@ export default async function Home() {
       {metrics.length === 0 && <EmptyState />}
 
       {portfolio && <PortfolioPanel portfolio={portfolio} />}
+
+      {timeline.metrics.length > 0 && <TimelinePanel timeline={timeline} />}
 
       {PANELS.map((panel) => {
         const panelMetrics = metrics.filter((m) => m.panel === panel.id);

@@ -6,7 +6,11 @@ export function MetricCard({ metric }: { metric: MetricView }) {
   const { latest, percentile, z } = metric;
 
   return (
-    <div className="rounded-xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-4 flex flex-col gap-2">
+    <a
+      href={`#timeline=${metric.key}`}
+      title={`View ${metric.name} on the master timeline`}
+      className="rounded-xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-4 flex flex-col gap-2 transition-colors hover:border-neutral-400 dark:hover:border-neutral-600"
+    >
       <div className="flex items-start justify-between gap-2">
         <h3
           className="text-sm font-medium text-neutral-700 dark:text-neutral-300 leading-snug"
@@ -43,6 +47,6 @@ export function MetricCard({ metric }: { metric: MetricView }) {
           {formatValue(metric.max, metric.unit, metric.decimals)}
         </span>
       </div>
-    </div>
+    </a>
   );
 }

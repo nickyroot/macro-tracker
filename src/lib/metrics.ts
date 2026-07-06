@@ -19,7 +19,9 @@ export type MetricTransform =
 export type MetricDef = {
   key: string;
   name: string;
-  panel: "dalio" | "buffett";
+  // "internal" metrics are computed and stored like the rest but never
+  // rendered as dashboard cards (e.g. recession dates for chart shading).
+  panel: "dalio" | "buffett" | "internal";
   unit: string; // display suffix: "%", "pp", ""
   decimals: number;
   describe: string;
@@ -202,6 +204,13 @@ export const METRICS: MetricDef[] = [
     unit: "", decimals: 1,
     describe: "University of Michigan survey",
     transform: { type: "direct", series: "UMCSENT" },
+  },
+  // — Internal: NBER recession months, used for chart shading —
+  {
+    key: "usrec", name: "NBER recession indicator", panel: "internal",
+    unit: "", decimals: 0,
+    describe: "1 during NBER-dated recessions",
+    transform: { type: "direct", series: "USREC" },
   },
 ];
 

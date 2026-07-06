@@ -37,7 +37,11 @@ percentiles out. See README.md for setup and architecture.
 - Metrics/series are config in `src/lib/metrics.ts`; transforms in
   `src/lib/stats.ts`. Adding a metric = config entry only.
 - Observation values are `Float` on purpose (analytics, not accounting).
-- Server components only so far; no client JS on the dashboard.
+- Server components by default. The master timeline (`timeline-panel`,
+  `time-series-chart`, `regime-strip`) is the only client island — keep new
+  interactivity inside it; everything else stays server-rendered.
+- Charts are hand-rolled SVG (no chart libraries) — keep it that way for
+  bundle size and design consistency.
 
 ## Portfolio engine
 
