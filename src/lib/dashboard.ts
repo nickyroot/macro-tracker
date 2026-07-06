@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/db";
 import type { SeriesPoint } from "@/lib/fred";
-import { METRICS, type MetricDef } from "@/lib/metrics";
+import { EXPLAINERS, METRICS, type MetricDef } from "@/lib/metrics";
 import { computePortfolio, QUADRANTS, type PortfolioResult } from "@/lib/portfolio";
 import { median, percentileRank, zScore } from "@/lib/stats";
 import { monthIdxFromDate, type TimelineData, type TimelinePoint } from "@/lib/timeline";
@@ -59,6 +59,7 @@ function buildTimeline(byKey: Map<string, { date: Date; value: number }[]>): Tim
         panel: def.panel,
         unit: def.unit,
         decimals: def.decimals,
+        explain: EXPLAINERS[def.key] ?? def.describe,
         points,
       }];
     }),

@@ -92,6 +92,9 @@ export function TimelinePanel({ timeline }: { timeline: TimelineData }) {
         <div className="mt-2 border-t border-neutral-100 pt-2 dark:border-neutral-800">
           <RegimeStrip regimes={timeline.regimes} recessions={timeline.recessions} domain={domain} />
         </div>
+        <p className="mt-3 rounded-lg bg-neutral-50 p-3 text-sm leading-relaxed text-neutral-600 dark:bg-neutral-800/40 dark:text-neutral-300">
+          {metric.explain}
+        </p>
       </div>
     </section>
   );

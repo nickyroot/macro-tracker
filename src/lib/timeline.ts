@@ -12,6 +12,7 @@ export type TimelineSeries = {
   panel: "dalio" | "buffett";
   unit: string;
   decimals: number;
+  explain: string;
   points: TimelinePoint[];
 };
 

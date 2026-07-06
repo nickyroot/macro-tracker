@@ -214,6 +214,56 @@ export const METRICS: MetricDef[] = [
   },
 ];
 
+// Plain-English explainer shown under the master timeline: what the metric
+// means and what low vs high readings imply. Keyed by metric key; the
+// timeline falls back to `describe` if a key is missing.
+export const EXPLAINERS: Record<string, string> = {
+  federal_debt_gdp:
+    "Federal debt / GDP measures how much the government owes relative to the size of the economy. When it's low, the state has room to borrow and spend to support growth; when it's high and rising, it raises the risk of higher taxes, inflationary money-printing, or restructuring — the late stage of Dalio's long-term debt cycle.",
+  household_debt_service:
+    "Household debt service is the share of after-tax income households spend servicing debt. Low readings mean consumers have room to borrow and spend, supporting growth; high readings leave households fragile, so a rate rise or job loss forces cutbacks that can tip the economy toward recession.",
+  yield_curve:
+    "The yield curve here is the gap between 10-year and 3-month Treasury yields. A wide positive gap is normal and signals expected growth; when it inverts (goes negative), markets are pricing rate cuts ahead — a signal that has preceded every US recession since the 1960s.",
+  real_10y:
+    "The real 10-year yield is the long-term Treasury rate after subtracting expected inflation — the true cost of money. Low or negative real yields are stimulative and push investors into risk assets; high real yields tighten conditions and weigh on stock and housing valuations.",
+  fed_bs_yoy:
+    "This is the year-over-year change in the Fed's asset holdings — how fast it's adding or draining liquidity. Expansion (quantitative easing) floods the system with cash and lifts asset prices; contraction (tightening) pulls cash out and pressures markets.",
+  m2_yoy:
+    "M2 growth is the annual change in the broad money supply. Rapid growth fuels spending and, with a lag, inflation; unusually slow or falling M2 signals shrinking liquidity and weakening demand.",
+  cpi_yoy:
+    "CPI inflation is the annual rate at which consumer prices rise. Low, stable inflation near 2% supports steady growth; high inflation erodes purchasing power and forces the Fed to raise rates, while negative readings (deflation) signal collapsing demand.",
+  core_pce_yoy:
+    "Core PCE is the Fed's preferred inflation gauge, excluding volatile food and energy. It drives interest-rate policy: readings above the 2% target push the Fed toward hikes, while readings well below it open the door to rate cuts.",
+  hy_spread:
+    "The high-yield spread is the extra yield investors demand to hold risky 'junk' bonds over safe Treasuries. Narrow spreads signal confidence and easy credit; a sharp widening is an early warning of credit stress that often front-runs recessions and market sell-offs.",
+  dollar_index:
+    "The dollar index tracks the US dollar's value against a basket of major currencies. A strong dollar lowers import prices (disinflationary) but hurts US exporters and strains dollar-indebted economies abroad; a weak dollar does the reverse.",
+  unemployment:
+    "The unemployment rate is the share of the labor force out of work but looking. Low unemployment signals a hot economy and potential wage-driven inflation; a rising rate signals slack and is one of the clearest markers of recession.",
+  sahm_rule:
+    "The Sahm rule is a real-time recession gauge based on how fast unemployment is climbing off its recent low. It has historically confirmed a recession is already underway once it crosses 0.50, making it one of the most reliable 'we're in it' signals.",
+  fed_funds:
+    "The fed funds rate is the Fed's short-term policy rate, the anchor for borrowing costs across the economy. Rising rates cool activity and inflation but risk over-tightening into recession; falling rates stimulate but can overheat.",
+  indpro_yoy:
+    "Industrial production growth tracks the annual change in factory, mining, and utility output — a direct read on the real economy. Positive growth signals expansion; contraction is a hallmark of recession, since manufacturing is highly cyclical.",
+  payems_yoy:
+    "Payrolls growth is the annual change in the number of nonfarm jobs. Steady growth underpins consumer spending and expansion; when it stalls or turns negative, it confirms the labor market is deteriorating and recession risk is elevated.",
+  breakeven_10y:
+    "The 10-year breakeven is the bond market's own forecast of average inflation over the next decade, read from the gap between nominal and inflation-protected yields. Rising breakevens mean markets expect more inflation; falling ones signal deflationary fear.",
+  buffett_indicator:
+    "The Buffett indicator is the total value of US stocks divided by GDP — Buffett's favorite gauge of whether the market is expensive. Low readings suggest stocks are cheap relative to the economy and offer strong long-run returns; high readings warn that valuations are stretched and future returns are likely muted.",
+  profit_margins:
+    "Corporate profits as a share of GDP measures economy-wide profit margins. Buffett called this one of the most reliably mean-reverting series in economics: unusually high margins tend to get competed away, while depressed margins tend to recover.",
+  treasury_10y:
+    "The 10-year Treasury yield is the benchmark long-term interest rate. Buffett describes rates as gravity for asset prices — low yields justify higher valuations across stocks and property, while high yields drag them down by offering a competitive risk-free return.",
+  mortgage_30y:
+    "The 30-year mortgage rate is the typical cost of a home loan. Low rates boost affordability and fuel housing demand and prices; high rates price out buyers, cool the market, and ripple through construction and consumer spending.",
+  home_prices_yoy:
+    "Home price growth is the annual change in national house prices. Steady appreciation builds household wealth and supports spending; rapid surges can signal a bubble, while outright declines — as in 2008 — can trigger broad financial stress.",
+  consumer_sentiment:
+    "Consumer sentiment surveys how optimistic households feel about their finances and the economy. High sentiment supports spending and growth; sharp drops often precede pullbacks in consumption, though at extremes it can be a contrarian bottoming signal.",
+};
+
 export const PANELS = [
   { id: "dalio" as const, title: "Debt cycle & regime", subtitle: "the Dalio panel" },
   { id: "buffett" as const, title: "Valuation & rates", subtitle: "the Buffett panel" },
