@@ -10,8 +10,9 @@ full historical distribution (percentile rank, z-score, trend sparkline).
   yield curve, real 10y yield, Fed balance sheet YoY, M2 YoY, CPI & core PCE
   inflation, high-yield spread, dollar index, unemployment, Sahm rule, fed funds.
 - **Valuation & rates (Buffett)** — Buffett indicator (corporate equities/GDP,
-  Z.1 based), corporate profits/GDP, 10y Treasury, 30y mortgage, home prices
-  YoY, consumer sentiment.
+  Z.1 based), corporate profits/GDP, Shiller CAPE, earnings yield vs the 10y
+  Treasury (equity risk premium), 10y Treasury, 30y mortgage, home prices YoY,
+  consumer sentiment.
 - **Suggested mix** — a dynamic All Weather model portfolio: quadrant regime
   probabilities (growth × inflation direction) tilt a static All Weather
   baseline, with Buffett-style valuation and real-rate overlays. Model
@@ -101,6 +102,10 @@ Postgres ──> / (ISR, revalidate 3600) ──> percentile cards + sparklines
   overwrites revised values. `?full=1` refetches everything.
 - ETF closes (VTI/TLT/IEF/SCHP/GLD/PDBC/BIL) come from Yahoo Finance's public
   chart API as adjusted monthly closes, no key needed — `src/lib/yahoo.ts`.
+- Shiller CAPE is scraped from multpl.com's monthly table (`src/lib/multpl.ts`),
+  keyless and current — Shiller's own spreadsheet is only served as stale
+  mirrors. From CAPE we derive the earnings yield vs the 10y Treasury (the
+  equity risk premium) via `invert` / `inv_spread` transforms.
 
 ### Portfolio engine (`src/lib/portfolio.ts`)
 
@@ -126,8 +131,8 @@ by backtesting, not truths.
 
 ## Roadmap
 
-- **Phase 2 (remaining)** — Shiller CAPE (Yale data), Treasury FiscalData,
-  allocation track-record view, composite gauges.
+- **Phase 2 (remaining)** — Treasury FiscalData, allocation track-record
+  view, composite gauges.
 - **Phase 3** — local ML jobs (trained on your machine, results pushed back):
   recession probability (yield-curve probit), regime classification (HMM),
   historical-analogue search, covariance-based risk parity as the portfolio

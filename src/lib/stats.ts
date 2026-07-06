@@ -54,6 +54,31 @@ export function ratio(num: SeriesPoint[], den: SeriesPoint[], scale: number): Se
   return out;
 }
 
+// scale / value — e.g. 100 / CAPE turns a P/E multiple into an earnings yield.
+export function invert(points: SeriesPoint[], scale: number): SeriesPoint[] {
+  return points
+    .filter((p) => p.value !== 0)
+    .map((p) => ({ date: p.date, value: scale / p.value }));
+}
+
+// (scale / num) − den, joined on exact date — e.g. (100 / CAPE) − 10y yield
+// gives the equity risk premium (earnings yield minus the bond yield).
+export function invSpread(
+  num: SeriesPoint[],
+  den: SeriesPoint[],
+  scale: number,
+): SeriesPoint[] {
+  const denByDate = new Map(den.map((p) => [p.date, p.value]));
+  const out: SeriesPoint[] = [];
+  for (const p of num) {
+    const d = denByDate.get(p.date);
+    if (p.value !== 0 && d !== undefined) {
+      out.push({ date: p.date, value: scale / p.value - d });
+    }
+  }
+  return out;
+}
+
 export function applyTransform(
   transform: MetricTransform,
   seriesByCode: Map<string, SeriesPoint[]>,
@@ -65,6 +90,14 @@ export function applyTransform(
       return yoy(seriesByCode.get(transform.series) ?? []);
     case "ratio":
       return ratio(
+        seriesByCode.get(transform.num) ?? [],
+        seriesByCode.get(transform.den) ?? [],
+        transform.scale,
+      );
+    case "invert":
+      return invert(seriesByCode.get(transform.series) ?? [], transform.scale);
+    case "inv_spread":
+      return invSpread(
         seriesByCode.get(transform.num) ?? [],
         seriesByCode.get(transform.den) ?? [],
         transform.scale,

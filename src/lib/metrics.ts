@@ -8,13 +8,15 @@ export type SeriesDef = {
   units: string;
   frequency: "m" | "q"; // frequency as stored (after FRED-side aggregation)
   aggregateMonthly?: boolean; // average daily/weekly data to monthly at the API
-  source?: "fred" | "yahoo"; // default fred
+  source?: "fred" | "yahoo" | "multpl"; // default fred
 };
 
 export type MetricTransform =
   | { type: "direct"; series: string }
   | { type: "yoy"; series: string } // % change vs same date one year earlier
-  | { type: "ratio"; num: string; den: string; scale: number };
+  | { type: "ratio"; num: string; den: string; scale: number }
+  | { type: "invert"; series: string; scale: number } // scale / value
+  | { type: "inv_spread"; num: string; den: string; scale: number }; // (scale/num) − den
 
 export type MetricDef = {
   key: string;
@@ -51,6 +53,9 @@ export const SERIES: SeriesDef[] = [
   { code: "MORTGAGE30US", name: "30y fixed mortgage rate", units: "%", frequency: "m", aggregateMonthly: true },
   { code: "CSUSHPINSA", name: "Case-Shiller national home price index", units: "index", frequency: "m" },
   { code: "UMCSENT", name: "Consumer sentiment (U. Michigan)", units: "index", frequency: "m" },
+  // Shiller CAPE from multpl.com (keyless; Shiller's own file is only served
+  // as stale mirrors). Monthly, back to 1871.
+  { code: "SHILLER_CAPE", name: "Shiller CAPE ratio", units: "ratio", frequency: "m", source: "multpl" },
   // — Regime-engine inputs (growth + inflation direction) —
   { code: "INDPRO", name: "Industrial production index", units: "index", frequency: "m" },
   { code: "PAYEMS", name: "Nonfarm payrolls", units: "thousands", frequency: "m" },
@@ -205,6 +210,19 @@ export const METRICS: MetricDef[] = [
     describe: "University of Michigan survey",
     transform: { type: "direct", series: "UMCSENT" },
   },
+  {
+    key: "cape", name: "Shiller CAPE", panel: "buffett",
+    unit: "", decimals: 1,
+    describe: "Price / 10-year average real earnings",
+    transform: { type: "direct", series: "SHILLER_CAPE" },
+  },
+  {
+    key: "excess_cape_yield", name: "Earnings yield − 10y", panel: "buffett",
+    unit: "pp", decimals: 2,
+    describe: "CAPE earnings yield minus the 10y Treasury (equity risk premium)",
+    // (100 / CAPE) − 10y Treasury yield. Both series are month-start dated.
+    transform: { type: "inv_spread", num: "SHILLER_CAPE", den: "DGS10", scale: 100 },
+  },
   // — Internal: NBER recession months, used for chart shading —
   {
     key: "usrec", name: "NBER recession indicator", panel: "internal",
@@ -262,6 +280,10 @@ export const EXPLAINERS: Record<string, string> = {
     "Home price growth is the annual change in national house prices. Steady appreciation builds household wealth and supports spending; rapid surges can signal a bubble, while outright declines — as in 2008 — can trigger broad financial stress.",
   consumer_sentiment:
     "Consumer sentiment surveys how optimistic households feel about their finances and the economy. High sentiment supports spending and growth; sharp drops often precede pullbacks in consumption, though at extremes it can be a contrarian bottoming signal.",
+  cape:
+    "The Shiller CAPE is the S&P 500 price divided by its inflation-adjusted average earnings over the past 10 years, which smooths out the business cycle. Low readings have historically signalled cheap stocks and strong long-run returns; high readings (above ~30) mark expensive markets and tend to precede weaker decade-ahead returns.",
+  excess_cape_yield:
+    "This is the CAPE earnings yield (the inverse of CAPE) minus the 10-year Treasury yield — how much extra stocks yield over bonds, a version of the 'Fed model' equity risk premium. A wide positive gap means stocks are cheap relative to bonds and favours equities; a negative gap (as in the late 1990s and again recently) means bonds offer competitive returns and stocks are richly priced.",
 };
 
 export const PANELS = [

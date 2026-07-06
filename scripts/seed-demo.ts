@@ -33,6 +33,7 @@ const DEMO: Record<string, DemoParams> = {
   MORTGAGE30US: { kind: "rate", start: 1971, initial: 7.5, mean: 7.5, reversion: 0.01, vol: 0.26, floor: 2.6 },
   CSUSHPINSA: { kind: "level", start: 1987, initial: 64, driftPct: 0.38, volPct: 0.55 },
   UMCSENT: { kind: "rate", start: 1978, initial: 85, mean: 87, reversion: 0.03, vol: 2.6, floor: 50 },
+  SHILLER_CAPE: { kind: "rate", start: 1950, initial: 12, mean: 22, reversion: 0.02, vol: 1.1, floor: 5 },
   INDPRO: { kind: "level", start: 1948, initial: 14, driftPct: 0.2, volPct: 0.8 },
   PAYEMS: { kind: "level", start: 1948, initial: 44_000, driftPct: 0.15, volPct: 0.25 },
   T10YIE: { kind: "rate", start: 2003, initial: 2.4, mean: 2.2, reversion: 0.03, vol: 0.12, floor: 0 },

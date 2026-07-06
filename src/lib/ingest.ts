@@ -3,6 +3,7 @@ import { Prisma } from "@/generated/prisma/client";
 import { fetchFredSeries, type SeriesPoint } from "@/lib/fred";
 import { METRICS, SERIES } from "@/lib/metrics";
 import { computePortfolio, QUADRANTS } from "@/lib/portfolio";
+import { fetchMultplCape } from "@/lib/multpl";
 import { applyTransform } from "@/lib/stats";
 import { fetchYahooMonthly } from "@/lib/yahoo";
 
@@ -154,15 +155,16 @@ export async function runIngest({ full = false }: { full?: boolean } = {}): Prom
 
   for (const def of SERIES) {
     try {
-      // Yahoo returns full history in one small request, so no
-      // incremental window is needed there.
-      const points =
-        def.source === "yahoo"
-          ? await fetchYahooMonthly(def.code)
-          : await fetchFredSeries(def.code, {
-              aggregateMonthly: def.aggregateMonthly,
-              observationStart,
-            });
+      // Yahoo and multpl each return full history in one small request,
+      // so no incremental window is needed there.
+      let points: SeriesPoint[];
+      if (def.source === "yahoo") points = await fetchYahooMonthly(def.code);
+      else if (def.source === "multpl") points = await fetchMultplCape();
+      else
+        points = await fetchFredSeries(def.code, {
+          aggregateMonthly: def.aggregateMonthly,
+          observationStart,
+        });
       const seriesId = idByCode.get(def.code);
       if (seriesId === undefined) throw new Error(`series row missing for ${def.code}`);
       rowsUpserted += await upsertObservations(seriesId, points);

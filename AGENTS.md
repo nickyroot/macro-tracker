@@ -35,7 +35,11 @@ percentiles out. See README.md for setup and architecture.
 ## Conventions
 
 - Metrics/series are config in `src/lib/metrics.ts`; transforms in
-  `src/lib/stats.ts`. Adding a metric = config entry only.
+  `src/lib/stats.ts`. Adding a metric = config entry only. Add a plain-English
+  EXPLAINERS entry too (shown under the master timeline).
+- Data sources: FRED (default), Yahoo chart API (ETF prices, `yahoo.ts`),
+  multpl.com scrape (Shiller CAPE, `multpl.ts`). Scraped sources are
+  best-effort — a fetch failure logs an error but doesn't abort the run.
 - Observation values are `Float` on purpose (analytics, not accounting).
 - Server components by default. The master timeline (`timeline-panel`,
   `time-series-chart`, `regime-strip`) is the only client island — keep new
