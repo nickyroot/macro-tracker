@@ -1,6 +1,6 @@
 import "dotenv/config";
 import type { SeriesPoint } from "../src/lib/fred";
-import { ensureSeries, persistPortfolio, recomputeMetrics, upsertObservations } from "../src/lib/ingest";
+import { ensureSeries, ingestGlobal, persistPortfolio, recomputeMetrics, upsertObservations } from "../src/lib/ingest";
 import { SERIES } from "../src/lib/metrics";
 
 // Seeds SYNTHETIC data so the dashboard renders without a FRED key.
@@ -113,9 +113,12 @@ async function main() {
   }
   const { computed, metricSeries, rawByCode } = await recomputeMetrics();
   const portfolio = await persistPortfolio(metricSeries, rawByCode);
+  // Global data is real (BIS, keyless) even in demo mode — also exercises the fetcher.
+  const global = await ingestGlobal();
   console.log(
     `Seeded ${rows} observations across ${SERIES.length} series; ${computed} metrics computed; ` +
-      `portfolio ${portfolio ? "computed" : "skipped (insufficient data)"}.`,
+      `portfolio ${portfolio ? "computed" : "skipped"}; global ${global.computed} country-series` +
+      (global.errors.length ? ` (errors: ${global.errors.join("; ")})` : "") + ".",
   );
   process.exit(0);
 }

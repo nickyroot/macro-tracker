@@ -3,6 +3,8 @@ import { Prisma } from "@/generated/prisma/client";
 import { fetchFredSeries, type SeriesPoint } from "@/lib/fred";
 import { METRICS, SERIES } from "@/lib/metrics";
 import { computePortfolio, computeTrackRecord, QUADRANTS } from "@/lib/portfolio";
+import { fetchBisByCountry } from "@/lib/bis";
+import { GLOBAL_COUNTRIES, GLOBAL_METRICS, globalKey } from "@/lib/global";
 import { fetchMultplCape } from "@/lib/multpl";
 import { applyTransform } from "@/lib/stats";
 import { fetchYahooMonthly } from "@/lib/yahoo";
@@ -152,6 +154,41 @@ function isoDaysAgo(days: number): string {
   return new Date(Date.now() - days * 86400_000).toISOString().slice(0, 10);
 }
 
+// Global debt-cycle data: one BIS request per metric returns every country,
+// so this is cheap. Terminal display data (no transforms), stored straight
+// into metric_points under "global:<metric>:<country>". Each metric is
+// replaced independently so one BIS failure can't wipe the others.
+export async function ingestGlobal(): Promise<{ computed: number; errors: string[] }> {
+  const errors: string[] = [];
+  let computed = 0;
+  const wanted = new Set<string>(GLOBAL_COUNTRIES.map((c) => c.code));
+
+  for (const metric of GLOBAL_METRICS) {
+    try {
+      const byCountry = await fetchBisByCountry(metric.dataflow, metric.queryKey);
+      const data = [...byCountry].filter(([code]) => wanted.has(code));
+      if (data.length === 0) throw new Error(`no wanted countries returned for ${metric.dataflow}`);
+      await prisma.metricPoint.deleteMany({
+        where: { metricKey: { startsWith: `${globalKey(metric.key, "")}` } },
+      });
+      for (const [code, points] of data) {
+        await prisma.metricPoint.createMany({
+          data: points.map((p) => ({
+            metricKey: globalKey(metric.key, code),
+            date: new Date(`${p.date}T00:00:00Z`),
+            value: p.value,
+          })),
+        });
+        computed++;
+      }
+      await new Promise((r) => setTimeout(r, 100));
+    } catch (e) {
+      errors.push(`global ${metric.key}: ${e instanceof Error ? e.message : String(e)}`);
+    }
+  }
+  return { computed, errors };
+}
+
 // full=true fetches each series' complete history (first run / backfill);
 // otherwise only the last two years, which is enough to capture revisions.
 export async function runIngest({ full = false }: { full?: boolean } = {}): Promise<IngestResult> {
@@ -193,6 +230,11 @@ export async function runIngest({ full = false }: { full?: boolean } = {}): Prom
     metricsComputed = computed;
     portfolioComputed = await persistPortfolio(metricSeries, rawByCode);
   }
+
+  // Global debt-cycle data (BIS) — independent of the US pipeline above.
+  const global = await ingestGlobal();
+  errors.push(...global.errors);
+
   const status: IngestResult["status"] = errors.length === 0 ? "ok" : "error";
 
   await prisma.ingestRun.create({

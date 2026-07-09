@@ -21,6 +21,10 @@ full historical distribution (percentile rank, z-score, trend sparkline).
   (median + 10–90th percentile context, NBER recession shading) with the
   regime-probability stack on the same time axis. Click a metric card to
   load it.
+- **Global debt cycle** — a cross-country heatmap (credit-to-GDP gap & ratio,
+  debt-service ratio, policy rate for 8 major economies) from BIS, each cell
+  colored by where that country sits in its own history — "who's late in
+  their debt cycle right now."
 
 ## Stack
 
@@ -106,6 +110,10 @@ Postgres ──> / (ISR, revalidate 3600) ──> percentile cards + sparklines
   keyless and current — Shiller's own spreadsheet is only served as stale
   mirrors. From CAPE we derive the earnings yield vs the 10y Treasury (the
   equity risk premium) via `invert` / `inv_spread` transforms.
+- Global debt-cycle data comes from the BIS SDMX API (`src/lib/bis.ts`,
+  keyless; one request per metric returns every country). Config in
+  `src/lib/global.ts`; stored as `global:<metric>:<country>` metric points
+  and rendered read-only, separate from the US series/transforms pipeline.
 
 ### Portfolio engine (`src/lib/portfolio.ts`)
 
@@ -131,8 +139,8 @@ by backtesting, not truths.
 
 ## Roadmap
 
-- **Phase 2 (remaining)** — Treasury FiscalData, allocation track-record
-  view, composite gauges.
+- **Phase 2 (remaining)** — Treasury FiscalData, composite gauges; global
+  expansion (IMF COFER reserve shares, per-country dashboards).
 - **Phase 3** — local ML jobs (trained on your machine, results pushed back):
   recession probability (yield-curve probit), regime classification (HMM),
   historical-analogue search, covariance-based risk parity as the portfolio

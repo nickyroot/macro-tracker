@@ -38,8 +38,13 @@ percentiles out. See README.md for setup and architecture.
   `src/lib/stats.ts`. Adding a metric = config entry only. Add a plain-English
   EXPLAINERS entry too (shown under the master timeline).
 - Data sources: FRED (default), Yahoo chart API (ETF prices, `yahoo.ts`),
-  multpl.com scrape (Shiller CAPE, `multpl.ts`). Scraped sources are
+  multpl.com scrape (Shiller CAPE, `multpl.ts`), BIS SDMX API (global
+  debt-cycle, `bis.ts` + config `global.ts`). Scraped/external sources are
   best-effort — a fetch failure logs an error but doesn't abort the run.
+- Global data lives OUTSIDE the SERIES/METRICS/transform pipeline: it's
+  written straight to metric_points as `global:<metric>:<country>` by
+  `ingestGlobal`, read by `buildGlobal`, and rendered by the (server) global
+  panel. Don't route it through METRICS — it's terminal display data.
 - Observation values are `Float` on purpose (analytics, not accounting).
 - Server components by default. The master timeline (`timeline-panel`,
   `time-series-chart`, `regime-strip`) is the only client island — keep new

@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/db";
 import type { SeriesPoint } from "@/lib/fred";
+import { GLOBAL_COUNTRIES, GLOBAL_METRICS, globalKey } from "@/lib/global";
 import { EXPLAINERS, METRICS, type MetricDef } from "@/lib/metrics";
 import { computePortfolio, QUADRANTS, type PortfolioResult } from "@/lib/portfolio";
 import { median, percentileRank, zScore } from "@/lib/stats";
@@ -29,10 +30,19 @@ export type TrackRecordView = {
   points: { dynamic: TimelinePoint[]; static: TimelinePoint[] };
 };
 
+export type GlobalCell = { value: number; percentile: number; date: string };
+export type GlobalView = {
+  countries: { code: string; name: string }[];
+  metrics: { key: string; name: string; unit: string; decimals: number; describe: string }[];
+  cells: Record<string, Record<string, GlobalCell | null>>; // [country][metric]
+  dataThrough: string | null;
+};
+
 export type DashboardData = {
   metrics: MetricView[];
   portfolio: PortfolioView | null;
   trackRecord: TrackRecordView | null;
+  global: GlobalView | null;
   timeline: TimelineData;
   dataThrough: string | null;
   lastRun: { finishedAt: string | null; status: string } | null;
@@ -79,6 +89,53 @@ function buildTrackRecord(
       dynamic: dyn.map((p) => [monthIdxFromDate(p.date), round4(p.value)]),
       static: sta.map((p) => [monthIdxFromDate(p.date), round4(p.value)]),
     },
+  };
+}
+
+// Cross-country debt-cycle heatmap: each country×metric cell is the latest
+// value plus where it sits in that country's own history (percentile), read
+// from the "global:<metric>:<country>" points BIS ingest wrote.
+function buildGlobal(byKey: Map<string, { date: Date; value: number }[]>): GlobalView | null {
+  const cells: Record<string, Record<string, GlobalCell | null>> = {};
+  const presentCountries: { code: string; name: string }[] = [];
+  let anyData = false;
+  let latestDate = "";
+
+  for (const c of GLOBAL_COUNTRIES) {
+    const row: Record<string, GlobalCell | null> = {};
+    let countryHasData = false;
+    for (const m of GLOBAL_METRICS) {
+      const hist = byKey.get(globalKey(m.key, c.code));
+      if (!hist || hist.length < 8) {
+        row[m.key] = null;
+        continue;
+      }
+      const values = hist.map((h) => h.value);
+      const latest = hist[hist.length - 1];
+      const date = latest.date.toISOString().slice(0, 10);
+      row[m.key] = {
+        value: latest.value,
+        percentile: percentileRank(values, latest.value),
+        date,
+      };
+      countryHasData = true;
+      anyData = true;
+      if (date > latestDate) latestDate = date;
+    }
+    if (countryHasData) {
+      cells[c.code] = row;
+      presentCountries.push({ code: c.code, name: c.name });
+    }
+  }
+
+  if (!anyData) return null;
+  return {
+    countries: presentCountries,
+    metrics: GLOBAL_METRICS.map((m) => ({
+      key: m.key, name: m.name, unit: m.unit, decimals: m.decimals, describe: m.describe,
+    })),
+    cells,
+    dataThrough: latestDate || null,
   };
 }
 
@@ -200,6 +257,7 @@ export async function getDashboardData(): Promise<DashboardData> {
     metrics,
     portfolio,
     trackRecord: buildTrackRecord(byKey),
+    global: buildGlobal(byKey),
     timeline: buildTimeline(byKey),
     dataThrough,
     lastRun: lastRun
