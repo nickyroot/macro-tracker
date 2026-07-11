@@ -63,3 +63,14 @@ phase-3 local jobs). It runs twice by design: persisted during ingest
 `getDashboardData` — keep the math identical in both paths (it's the same
 function; don't fork it). Invariants: weights sum to 100, no negative
 weights, quadrant probs sum to 1, active share ≤ 20pp.
+
+## ML workspace (ml/)
+
+Phase-3 local jobs live in `ml/` (uv-managed Python; run `uv run` from ml/).
+The cloud app never executes Python. Data flows only through the two bridges:
+`npm run ml:export` (DB -> ml/data CSVs) and `npm run ml:import` (ml/out ->
+metric_points, `ml:`-prefixed keys only — the import script refuses others).
+`ml/src/macroml/config.py` mirrors the TS engine and MUST be kept in sync
+with src/lib/portfolio.ts; `python -m macroml.backtest` prints a port check
+(max abs diff vs stored track_dynamic) that must stay ~0. Vintage-correct
+evaluation uses ALFRED initial releases (see ml/README.md for caveats).

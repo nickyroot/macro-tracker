@@ -10,7 +10,9 @@
     "backfill": "tsx scripts/backfill.ts",
     "seed:demo": "tsx scripts/seed-demo.ts",
     "db:wipe": "tsx scripts/wipe-data.ts",
-    "postinstall": "prisma generate"
+    "postinstall": "prisma generate",
+    "ml:export": "tsx scripts/export-ml-data.ts",
+    "ml:import": "tsx scripts/import-ml-results.ts"
   },
   "dependencies": {
     "@prisma/adapter-pg": "^7.8.0",
