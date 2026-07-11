@@ -1,6 +1,7 @@
 import { GlobalPanel } from "@/components/global-panel";
 import { MetricCard } from "@/components/metric-card";
 import { PortfolioPanel } from "@/components/portfolio-panel";
+import { RecessionPanel } from "@/components/recession-panel";
 import { TrackRecordPanel } from "@/components/track-record-panel";
 import { TimelinePanel } from "@/components/timeline-panel";
 import { getDashboardData } from "@/lib/dashboard";
@@ -12,7 +13,7 @@ import { PANELS } from "@/lib/metrics";
 export const revalidate = 3600;
 
 export default async function Home() {
-  const { metrics, portfolio, trackRecord, global, timeline, dataThrough, lastRun } = await getDashboardData();
+  const { metrics, portfolio, trackRecord, ml, global, timeline, dataThrough, lastRun } = await getDashboardData();
 
   return (
     <div className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6">
@@ -40,6 +41,8 @@ export default async function Home() {
       {portfolio && <PortfolioPanel portfolio={portfolio} />}
 
       {trackRecord && <TrackRecordPanel track={trackRecord} />}
+
+      {ml && <RecessionPanel ml={ml} recessions={timeline.recessions} />}
 
       {timeline.metrics.length > 0 && <TimelinePanel timeline={timeline} />}
 

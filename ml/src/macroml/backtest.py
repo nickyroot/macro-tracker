@@ -14,14 +14,12 @@ Writes ml/out/summary.json and ml/out/metric_points.csv (ml:bt_* series).
 from __future__ import annotations
 
 import json
-from pathlib import Path
 
-from . import alfred
 from .config import ASSETS, VINTAGE_SOURCES
 from .data import etf_prices, idx_to_date, load_metric_points, load_observations
 from .engine import probs_series, weights_from_probs
-
-OUT_DIR = Path(__file__).resolve().parents[2] / "out"
+from .output import OUT_DIR, write_metric_points
+from .pit import vintage_known_at
 
 
 def compound(
@@ -68,41 +66,6 @@ def stats(index: dict[int, float]) -> dict:
     }
 
 
-def vintage_known_at() -> dict:
-    """For each revised metric, a fn(t) -> series as known at month t, built
-    from ALFRED initial releases (YoY metrics divide two initial prints)."""
-    observations = load_observations()
-    fns = {}
-    for metric_key, source in VINTAGE_SOURCES.items():
-        vintage = alfred.vintage_series(source, observations.get(source, {}))
-        is_yoy = metric_key.endswith("_yoy")
-        if is_yoy:
-            by_period = {p: (r, v) for p, r, v in vintage}
-            rows = []
-            for p, (r, v) in sorted(by_period.items()):
-                prev = by_period.get(p - 12)
-                if prev and prev[1] != 0:
-                    rows.append((p, max(r, prev[0]), (v / prev[1] - 1.0) * 100.0))
-        else:
-            rows = vintage
-
-        def fn(t: int, rows=rows) -> dict[int, float]:
-            return {p: v for p, r, v in rows if r <= t and p <= t}
-
-        fns[metric_key] = fn
-
-    # Sahm rule is real-time by construction but publishes with a one-month
-    # lag (month t's value arrives with t+1's employment report).
-    metric_points = load_metric_points()
-    sahm = sorted(metric_points.get("sahm_rule", {}).items())
-
-    def sahm_fn(t: int) -> dict[int, float]:
-        return {p: v for p, v in sahm if p + 1 <= t}
-
-    fns["sahm_rule"] = sahm_fn
-    return fns
-
-
 def main() -> None:
     metric_points = load_metric_points()
     observations = load_observations()
@@ -126,7 +89,7 @@ def main() -> None:
     print(f"port check vs stored track_dynamic: max abs diff = {max_err:.4f} over {len(overlap)} months")
 
     # --- vintage mode: the honest run ---
-    known_at = vintage_known_at()
+    known_at = vintage_known_at(VINTAGE_SOURCES, observations, metric_points)
     probs_vint = probs_series(metric_points, months, mode="asof", known_at=known_at)
     weights_vint = {t: weights_from_probs(p) for t, p in probs_vint.items()}
     vint_idx = compound(prices, months, weights_vint)
@@ -143,15 +106,11 @@ def main() -> None:
 
     OUT_DIR.mkdir(parents=True, exist_ok=True)
     (OUT_DIR / "summary.json").write_text(json.dumps(summary, indent=2))
-    with open(OUT_DIR / "metric_points.csv", "w") as f:
-        f.write("metric_key,date,value\n")
-        for key, series in [
-            ("ml:bt_static", static_idx),
-            ("ml:bt_dynamic_fullsample", full_idx),
-            ("ml:bt_dynamic_vintage", vint_idx),
-        ]:
-            for m in sorted(series):
-                f.write(f"{key},{idx_to_date(m)},{series[m]:.4f}\n")
+    write_metric_points({
+        "ml:bt_static": static_idx,
+        "ml:bt_dynamic_fullsample": full_idx,
+        "ml:bt_dynamic_vintage": vint_idx,
+    })
 
     fmt = lambda s: (f"CAGR {s['cagr']*100:5.2f}%  vol {s['vol']*100:5.2f}%  "
                      f"maxDD {s['max_drawdown']*100:6.2f}%  total {s['total']*100:6.1f}%")

@@ -74,3 +74,12 @@ metric_points, `ml:`-prefixed keys only — the import script refuses others).
 with src/lib/portfolio.ts; `python -m macroml.backtest` prints a port check
 (max abs diff vs stored track_dynamic) that must stay ~0. Vintage-correct
 evaluation uses ALFRED initial releases (see ml/README.md for caveats).
+
+Jobs write result series via `output.py` (merge-by-key into the shared
+ml/out/metric_points.csv) and must be deterministic — no random seeds.
+Models are validated walk-forward with point-in-time features (`pit.py`)
+and report against dumber baselines; publish scores as-is, don't re-spec
+after seeing out-of-sample results. `scripts/ml-weekly.sh` runs the whole
+export→jobs→import loop (launchd plist in ml/launchd/). The dashboard reads
+ml:* keys in buildMl/RecessionPanel — like global:*, they never go through
+the METRICS pipeline.

@@ -30,6 +30,18 @@ export type TrackRecordView = {
   points: { dynamic: TimelinePoint[]; static: TimelinePoint[] };
 };
 
+// Local-ML output (phase 3): the walk-forward recession probability plus the
+// honesty stats the Mac job publishes alongside it. Values are percents.
+export type MlView = {
+  current: { date: string; prob: number };
+  points: TimelinePoint[];
+  oosStartYear: number;
+  auc: number | null;
+  aucCurveOnly: number | null;
+  brier: number | null;
+  baseRate: number | null;
+};
+
 export type GlobalCell = { value: number; percentile: number; date: string };
 export type GlobalView = {
   countries: { code: string; name: string }[];
@@ -42,6 +54,7 @@ export type DashboardData = {
   metrics: MetricView[];
   portfolio: PortfolioView | null;
   trackRecord: TrackRecordView | null;
+  ml: MlView | null;
   global: GlobalView | null;
   timeline: TimelineData;
   dataThrough: string | null;
@@ -89,6 +102,22 @@ function buildTrackRecord(
       dynamic: dyn.map((p) => [monthIdxFromDate(p.date), round4(p.value)]),
       static: sta.map((p) => [monthIdxFromDate(p.date), round4(p.value)]),
     },
+  };
+}
+
+function buildMl(byKey: Map<string, { date: Date; value: number }[]>): MlView | null {
+  const hist = byKey.get("ml:recession_prob");
+  if (!hist || hist.length < 24) return null;
+  const stat = (key: string) => byKey.get(key)?.at(-1)?.value ?? null;
+  const latest = hist[hist.length - 1];
+  return {
+    current: { date: latest.date.toISOString().slice(0, 10), prob: latest.value },
+    points: hist.map((p) => [monthIdxFromDate(p.date), round4(p.value)]),
+    oosStartYear: hist[0].date.getUTCFullYear(),
+    auc: stat("ml:recession_auc"),
+    aucCurveOnly: stat("ml:recession_auc_curve"),
+    brier: stat("ml:recession_brier"),
+    baseRate: stat("ml:recession_base"),
   };
 }
 
@@ -257,6 +286,7 @@ export async function getDashboardData(): Promise<DashboardData> {
     metrics,
     portfolio,
     trackRecord: buildTrackRecord(byKey),
+    ml: buildMl(byKey),
     global: buildGlobal(byKey),
     timeline: buildTimeline(byKey),
     dataThrough,
