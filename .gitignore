@@ -47,3 +47,5 @@ next-env.d.ts
 ml/data/
 ml/out/
 ml/.venv/
+__pycache__/
+*.pyc
