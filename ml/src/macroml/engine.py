@@ -98,6 +98,20 @@ def quadrant_probs(gz: float, iz: float) -> dict[str, float]:
     }
 
 
+def guardrail(w: dict[str, float], cap: float = ACTIVE_SHARE_CAP) -> dict[str, float]:
+    """No shorts, active share <= cap (pp of 100), renormalise to 100 — the
+    exact port of the TS engine's guardrail, reusable at other caps (the M3
+    blend runs it at its earned budget; cap 0 forces the baseline)."""
+    baselines = {key: base for key, _, base in ASSETS}
+    w = {k: max(0.0, v) for k, v in w.items()}
+    active = sum(abs(w[k] - baselines[k]) for k in w) / 2
+    if active > cap:
+        scale = cap / active
+        w = {k: baselines[k] + (w[k] - baselines[k]) * scale for k in w}
+    total = sum(w.values())
+    return {k: v / total * 100.0 for k, v in w.items()}
+
+
 def weights_from_probs(probs: dict[str, float]) -> dict[str, float]:
     """baseline + prob-weighted tilts, then the guardrails — an exact port of
     applyQuadrantTilts + guardrail in portfolio.ts."""
@@ -105,18 +119,7 @@ def weights_from_probs(probs: dict[str, float]) -> dict[str, float]:
     for q in QUADRANTS:
         for asset, tilt in TILTS[q].items():
             w[asset] += probs[q] * tilt
-    for k in w:
-        w[k] = max(0.0, w[k])
-    baselines = {key: base for key, _, base in ASSETS}
-    active = sum(abs(w[k] - baselines[k]) for k in w) / 2
-    if active > ACTIVE_SHARE_CAP:
-        scale = ACTIVE_SHARE_CAP / active
-        for k in w:
-            w[k] = baselines[k] + (w[k] - baselines[k]) * scale
-    total = sum(w.values())
-    for k in w:
-        w[k] = w[k] / total * 100.0
-    return w
+    return guardrail(w, ACTIVE_SHARE_CAP)
 
 
 def composites_series(

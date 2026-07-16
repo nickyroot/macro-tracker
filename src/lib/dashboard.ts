@@ -2,7 +2,7 @@ import { prisma } from "@/lib/db";
 import type { SeriesPoint } from "@/lib/fred";
 import { GLOBAL_COUNTRIES, GLOBAL_METRICS, globalKey } from "@/lib/global";
 import { EXPLAINERS, METRICS, type MetricDef } from "@/lib/metrics";
-import { computePortfolio, QUADRANTS, type PortfolioResult } from "@/lib/portfolio";
+import { ASSETS, computePortfolio, QUADRANTS, type PortfolioResult } from "@/lib/portfolio";
 import { median, percentileRank, zScore } from "@/lib/stats";
 import { monthIdxFromDate, type TimelineData, type TimelinePoint } from "@/lib/timeline";
 
@@ -41,6 +41,24 @@ export type MlView = {
   brier: number | null;
   baseRate: number | null;
   regimeNext: RegimeForecast | null;
+  mix: BlendMixView | null;
+};
+
+// M3: the Black-Litterman blend's published mix. Its deviation from the
+// baseline is capped at the budget the walk-forward evidence earned.
+export type BlendMixView = {
+  date: string;
+  budget: number; // pp of the 10pp reference cap
+  ir: number | null;
+  te: number | null; // %/yr
+  excessCagr: number | null; // pp/yr vs static
+  evalStartYear: number | null;
+  evalMonths: number | null;
+  activeShare: number;
+  assets: {
+    key: string; name: string; etf: string; baseline: number;
+    weight: number; delta: number; view: number | null;
+  }[];
 };
 
 // M2: the regime forecast (published forecaster: walk-forward-validated
@@ -146,6 +164,38 @@ function buildRegimeForecast(
   };
 }
 
+function buildBlendMix(
+  byKey: Map<string, { date: Date; value: number }[]>,
+  stat: (key: string) => number | null,
+): BlendMixView | null {
+  const budget = stat("ml:blend_budget");
+  if (budget == null) return null;
+  const assets = [];
+  let date = "";
+  let active = 0;
+  for (const a of ASSETS) {
+    const w = byKey.get(`ml:blend_w_${a.key}`)?.at(-1);
+    if (!w) return null;
+    date = w.date.toISOString().slice(0, 10);
+    const delta = w.value - a.baseline;
+    active += Math.abs(delta);
+    assets.push({
+      key: a.key, name: a.name, etf: a.etf, baseline: a.baseline,
+      weight: w.value, delta, view: stat(`ml:view_${a.key}`),
+    });
+  }
+  const bt = byKey.get("ml:bt_blend");
+  return {
+    date, budget, assets,
+    ir: stat("ml:blend_ir"),
+    te: stat("ml:blend_te"),
+    excessCagr: stat("ml:blend_excess_cagr"),
+    evalStartYear: bt?.length ? bt[0].date.getUTCFullYear() : null,
+    evalMonths: bt?.length ? bt.length - 1 : null,
+    activeShare: active / 2,
+  };
+}
+
 function buildMl(byKey: Map<string, { date: Date; value: number }[]>): MlView | null {
   const hist = byKey.get("ml:recession_prob");
   if (!hist || hist.length < 24) return null;
@@ -160,6 +210,7 @@ function buildMl(byKey: Map<string, { date: Date; value: number }[]>): MlView | 
     brier: stat("ml:recession_brier"),
     baseRate: stat("ml:recession_base"),
     regimeNext: buildRegimeForecast(byKey, stat),
+    mix: buildBlendMix(byKey, stat),
   };
 }
 

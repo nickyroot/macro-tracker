@@ -56,6 +56,11 @@ export const SERIES: SeriesDef[] = [
   // Shiller CAPE from multpl.com (keyless; Shiller's own file is only served
   // as stale mirrors). Monthly, back to 1871.
   { code: "SHILLER_CAPE", name: "Shiller CAPE ratio", units: "ratio", frequency: "m", source: "multpl" },
+  // S&P 500 price + dividend yield back to 1871 (multpl) — not dashboard
+  // cards; they exist to build a long total-return series for the phase-3
+  // ML jobs to validate valuation views against (ml/ reads them via export).
+  { code: "SP500_PRICE", name: "S&P 500 price (monthly)", units: "index", frequency: "m", source: "multpl" },
+  { code: "SP500_DIVYIELD", name: "S&P 500 dividend yield", units: "%", frequency: "m", source: "multpl" },
   // — Regime-engine inputs (growth + inflation direction) —
   { code: "INDPRO", name: "Industrial production index", units: "index", frequency: "m" },
   { code: "PAYEMS", name: "Nonfarm payrolls", units: "thousands", frequency: "m" },

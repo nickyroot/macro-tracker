@@ -5,7 +5,7 @@ import { METRICS, SERIES } from "@/lib/metrics";
 import { computePortfolio, computeTrackRecord, QUADRANTS } from "@/lib/portfolio";
 import { fetchBisByCountry } from "@/lib/bis";
 import { GLOBAL_COUNTRIES, GLOBAL_METRICS, globalKey } from "@/lib/global";
-import { fetchMultplCape } from "@/lib/multpl";
+import { fetchMultpl } from "@/lib/multpl";
 import { applyTransform } from "@/lib/stats";
 import { fetchYahooMonthly } from "@/lib/yahoo";
 
@@ -206,7 +206,7 @@ export async function runIngest({ full = false }: { full?: boolean } = {}): Prom
       // so no incremental window is needed there.
       let points: SeriesPoint[];
       if (def.source === "yahoo") points = await fetchYahooMonthly(def.code);
-      else if (def.source === "multpl") points = await fetchMultplCape();
+      else if (def.source === "multpl") points = await fetchMultpl(def.code);
       else
         points = await fetchFredSeries(def.code, {
           aggregateMonthly: def.aggregateMonthly,

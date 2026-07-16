@@ -1,3 +1,4 @@
+import { BlendPanel } from "@/components/blend-panel";
 import { GlobalPanel } from "@/components/global-panel";
 import { MetricCard } from "@/components/metric-card";
 import { PortfolioPanel } from "@/components/portfolio-panel";
@@ -46,6 +47,8 @@ export default async function Home() {
       {ml && <RecessionPanel ml={ml} recessions={timeline.recessions} />}
 
       {ml?.regimeNext && <RegimeForecastPanel forecast={ml.regimeNext} />}
+
+      {ml?.mix && <BlendPanel mix={ml.mix} />}
 
       {timeline.metrics.length > 0 && <TimelinePanel timeline={timeline} />}
 

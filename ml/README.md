@@ -13,6 +13,7 @@ cd ml
 FRED_API_KEY=... uv run python -m macroml.backtest   # -> ml/out/
 uv run python -m macroml.recession                    # -> ml/out/ (M1)
 uv run python -m macroml.regime                       # -> ml/out/ (M2)
+uv run python -m macroml.blend                        # -> ml/out/ (M3)
 
 # 3. push results up (only ml:* metric keys are allowed through)
 npm run ml:import           # ml/out/metric_points.csv -> metric_points
@@ -49,6 +50,11 @@ that schedules it weekly (Mon 09:00) — install instructions in its comments.
   Four predeclared forecasters scored walk-forward (OVR-logit challenger,
   persistence, transition matrix, climatology); the winner gets published.
   Writes `ml/out/regime.json` + `ml:regime_*` for the dashboard panel.
+- `blend.py` — M3: return views (quadrant-conditional means x the M2
+  forecast; CAPE-percentile valuation on 1871+ S&P total returns) blended
+  Black-Litterman style around the baseline. The published mix's deviation
+  is capped at budget earned out-of-sample: 10pp x clip(IR vs static, 0, 1),
+  re-earned every run. Writes `ml/out/blend.json` + `ml:view_*`/`ml:blend_*`.
 
 ## M0 result (2026-07-09, 2014-12 → 2026-06)
 
@@ -93,7 +99,22 @@ more correct calls. Future challengers: probability-weighted transition
 mixing (soft conditioning instead of argmax), duration-dependent
 transitions.
 
+## M3 result (2026-07-16, walk-forward 2016-12 → 2026-06, 114 months)
+
+Blend at the 10pp reference cap vs static All Weather: CAGR 7.32% vs 6.34%
+(+0.97pp/yr), vol 8.85% vs 9.08%, maxDD −20.7% vs −22.2%. TE 1.11%/yr,
+**IR +0.81 → earned budget 8.1pp of 10pp**. Valuation view honesty check:
+OOS since ~1901 (1,603 months), R² vs zero-forecast +0.119, slope
+−0.082%/CAPE-percentile — real but modest, exactly the literature's answer.
+
+Excess by calendar year (blend − static): 2017 −0.1 · 2018 +0.5 · 2019 −0.4
+· 2020 +1.6 · 2021 +1.4 · 2022 +2.0 · 2023 +0.9 · 2024 +2.7 · 2025 +0.6 ·
+2026 YTD **−2.1** (worst year). Positive 7 of 10 years, but the bulk sits
+in the 2021-24 inflation cycle — one decade, one regime cycle. Treat the
+edge as provisional; the budget re-earns (and shrinks) on every weekly run.
+
 ## Next milestones
 
-- M3: return views + Black-Litterman blend; models earn tilt budget from
-  walk-forward evidence produced by this harness.
+- Challengers: probability-weighted transition mixing (M2), duration-
+  dependent transitions, revision-triangle vintages (alfred output_type=2).
+- Risk-parity baseline weights from the covariance estimate (vs fixed AW).

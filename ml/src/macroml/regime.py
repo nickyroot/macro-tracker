@@ -64,20 +64,48 @@ def multiclass_scores(y: np.ndarray, P: np.ndarray) -> dict:
     }
 
 
-def main() -> None:
-    metric_points = load_metric_points()
-    observations = load_observations()
+def asof_engine(
+    metric_points: dict[str, dict[int, float]],
+    observations: dict[str, dict[int, float]],
+) -> tuple[dict[int, tuple[float, float]], dict[int, int]]:
+    """As-of composites and their argmax quadrant index per month — the
+    honest regime reading this job and the M3 blend both build on."""
     fns = vintage_known_at(VINTAGE_SOURCES, observations, metric_points)
-
     keys = {"sahm_rule", "unemployment", "yield_curve", "hy_spread", "indpro_yoy",
             "payems_yoy", "consumer_sentiment", "cpi_yoy", "core_pce_yoy",
             "m2_yoy", "breakeven_10y"}
     t_max = max(max(metric_points[k]) for k in keys if k in metric_points)
     months = list(range(GRID_START, t_max + 1))
     comps = composites_series(metric_points, months, mode="asof", known_at=fns)
-
     quad = {t: int(np.argmax([quadrant_probs(gz, iz)[q] for q in QUADRANTS]))
             for t, (gz, iz) in comps.items()}
+    return comps, quad
+
+
+def eligible_examples(comps: dict, quad: dict[int, int]) -> dict[int, int]:
+    """s -> quadrant at s+HORIZON, for months where the walk-forward's
+    feature vector exists (s and s-DELTA in comps) and the label is known."""
+    return {s: quad[s + HORIZON] for s in sorted(comps)
+            if s - DELTA in comps and s + HORIZON in quad}
+
+
+def transition_forecast(quad: dict[int, int], labeled: dict[int, int], t: int) -> np.ndarray | None:
+    """The published forecaster: Laplace-smoothed expanding transition row
+    for t's quadrant, trained on examples embargoed LABEL_LAG months."""
+    train_s = [s for s in labeled if s <= t - LABEL_LAG]
+    if len(train_s) < MIN_TRAIN or t not in quad:
+        return None
+    k = len(QUADRANTS)
+    counts = np.ones((k, k))
+    for s in train_s:
+        counts[quad[s], labeled[s]] += 1.0
+    return counts[quad[t]] / counts[quad[t]].sum()
+
+
+def main() -> None:
+    metric_points = load_metric_points()
+    observations = load_observations()
+    comps, quad = asof_engine(metric_points, observations)
 
     def x_at(t: int) -> list[float] | None:
         if t not in comps or t - DELTA not in comps:
@@ -90,7 +118,7 @@ def main() -> None:
         return quad.get(s + HORIZON)
 
     rows = {s: x for s in sorted(comps) if (x := x_at(s)) is not None}
-    labeled = {s: yv for s in rows if (yv := label(s)) is not None}
+    labeled = eligible_examples(comps, quad)
 
     t_last = max(comps)
     k = len(QUADRANTS)
@@ -112,10 +140,7 @@ def main() -> None:
         fc[t] = p / p.sum()
 
         fc_persist[t] = np.array([quadrant_probs(*comps[t])[q] for q in QUADRANTS])
-        counts = np.ones((k, k))  # Laplace smoothing
-        for s in train_s:
-            counts[quad[s], labeled[s]] += 1.0
-        fc_trans[t] = counts[quad[t]] / counts[quad[t]].sum()
+        fc_trans[t] = transition_forecast(quad, labeled, t)
         fc_clim[t] = np.bincount(y, minlength=k) / len(y)
 
     scored = [t for t in fc if label(t) is not None]
