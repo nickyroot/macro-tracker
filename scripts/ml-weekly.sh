@@ -15,6 +15,6 @@ source .env.prod-db.local   # prod DATABASE_URL overrides .env's local one
 set +a
 
 npm run ml:export
-(cd ml && uv run python -m macroml.backtest && uv run python -m macroml.recession)
+(cd ml && uv run python -m macroml.backtest && uv run python -m macroml.recession && uv run python -m macroml.regime)
 npm run ml:import
 echo "== $(date '+%Y-%m-%d %H:%M:%S') ml-weekly done"

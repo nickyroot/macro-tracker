@@ -12,6 +12,7 @@ npm run ml:export           # -> ml/data/*.csv
 cd ml
 FRED_API_KEY=... uv run python -m macroml.backtest   # -> ml/out/
 uv run python -m macroml.recession                    # -> ml/out/ (M1)
+uv run python -m macroml.regime                       # -> ml/out/ (M2)
 
 # 3. push results up (only ml:* metric keys are allowed through)
 npm run ml:import           # ml/out/metric_points.csv -> metric_points
@@ -44,6 +45,10 @@ that schedules it weekly (Mon 09:00) — install instructions in its comments.
   (10y−FF), fed-funds 12m change, Sahm rule, INDPRO initial prints. Monthly
   refits, 24-month label embargo (outcome window + NBER announcement lag).
   Writes `ml/out/recession.json` + `ml:recession_*` for the dashboard panel.
+- `regime.py` — M2: which quadrant will the as-of engine read in 3 months?
+  Four predeclared forecasters scored walk-forward (OVR-logit challenger,
+  persistence, transition matrix, climatology); the winner gets published.
+  Writes `ml/out/regime.json` + `ml:regime_*` for the dashboard panel.
 
 ## M0 result (2026-07-09, 2014-12 → 2026-06)
 
@@ -70,8 +75,25 @@ probabilities are overconfident — OOS readings above 75% realized only ~53%
 of the time, driven by the 2022-25 inversion false alarm (Jun-2024 read 85%).
 Reported as-is on the dashboard; no post-hoc re-specification.
 
+## M2 result (2026-07-14, out-of-sample 1975-01 → 2026-03, 615 scored months)
+
+| forecaster (3m ahead) | accuracy | Brier | log loss |
+|---|---|---|---|
+| **transition matrix (published)** | 69.6% | **0.486** | **0.931** |
+| persistence (no change) | **70.9%** | 0.573 | 1.054 |
+| OVR ridge-logit challenger | 58.2% | 0.520 | 0.949 |
+| climatology | 20.5% | 0.796 | 1.507 |
+
+The ML challenger lost: its momentum features call regime changes too
+eagerly. The expanding-count transition matrix wins on calibration and gets
+the dashboard per the earn-your-place rule. Context: the label itself is
+soft (as-of vs full-sample argmax agree only 66.7%), so ~70% accuracy is
+near the noise ceiling — the value over persistence is calibration, not
+more correct calls. Future challengers: probability-weighted transition
+mixing (soft conditioning instead of argmax), duration-dependent
+transitions.
+
 ## Next milestones
 
-- M2: regime forecaster (P(next quadrant))
 - M3: return views + Black-Litterman blend; models earn tilt budget from
   walk-forward evidence produced by this harness.

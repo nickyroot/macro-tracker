@@ -40,6 +40,20 @@ export type MlView = {
   aucCurveOnly: number | null;
   brier: number | null;
   baseRate: number | null;
+  regimeNext: RegimeForecast | null;
+};
+
+// M2: the regime forecast (published forecaster: walk-forward-validated
+// transition matrix). now/next are percents from the job's as-of engine.
+export type RegimeForecast = {
+  horizonMonths: number;
+  date: string;
+  quadrants: { key: string; name: string; now: number; next: number }[];
+  topKey: string;
+  accuracy: number | null;
+  accuracyPersistence: number | null;
+  brier: number | null;
+  brierPersistence: number | null;
 };
 
 export type GlobalCell = { value: number; percentile: number; date: string };
@@ -105,6 +119,33 @@ function buildTrackRecord(
   };
 }
 
+function buildRegimeForecast(
+  byKey: Map<string, { date: Date; value: number }[]>,
+  stat: (key: string) => number | null,
+): RegimeForecast | null {
+  const quadrants = [];
+  let date = "";
+  for (const q of QUADRANTS) {
+    const nextHist = byKey.get(`ml:regime_next_${q.key}`);
+    const now = stat(`ml:regime_now_${q.key}`);
+    if (!nextHist || nextHist.length < 24 || now == null) return null;
+    const latest = nextHist[nextHist.length - 1];
+    date = latest.date.toISOString().slice(0, 10);
+    quadrants.push({ key: q.key, name: q.name, now, next: latest.value });
+  }
+  const top = [...quadrants].sort((a, b) => b.next - a.next)[0];
+  return {
+    horizonMonths: 3, // keep in sync with ml/src/macroml/regime.py HORIZON
+    date,
+    quadrants,
+    topKey: top.key,
+    accuracy: stat("ml:regime_next_acc"),
+    accuracyPersistence: stat("ml:regime_next_acc_persist"),
+    brier: stat("ml:regime_next_brier"),
+    brierPersistence: stat("ml:regime_next_brier_persist"),
+  };
+}
+
 function buildMl(byKey: Map<string, { date: Date; value: number }[]>): MlView | null {
   const hist = byKey.get("ml:recession_prob");
   if (!hist || hist.length < 24) return null;
@@ -118,6 +159,7 @@ function buildMl(byKey: Map<string, { date: Date; value: number }[]>): MlView | 
     aucCurveOnly: stat("ml:recession_auc_curve"),
     brier: stat("ml:recession_brier"),
     baseRate: stat("ml:recession_base"),
+    regimeNext: buildRegimeForecast(byKey, stat),
   };
 }
 

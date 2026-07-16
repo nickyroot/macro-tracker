@@ -119,19 +119,19 @@ def weights_from_probs(probs: dict[str, float]) -> dict[str, float]:
     return w
 
 
-def probs_series(
+def composites_series(
     metric_series: dict[str, dict[int, float]],
     months: list[int],
     mode: str,
     known_at: dict[str, "callable"] | None = None,
-) -> dict[int, dict[str, float]]:
-    """Quadrant probabilities per decision month (unsmoothed, matching the
-    regimeHistory convention the track record compounds on).
+) -> dict[int, tuple[float, float]]:
+    """(growth z, inflation z) per decision month — the engine's sufficient
+    statistics, exposed for jobs that model the composites themselves.
 
     `known_at`, if given, maps metric_key -> fn(t) returning the series as
     known at t (vintage mode). Otherwise the exported series is used as-is.
     """
-    out: dict[int, dict[str, float]] = {}
+    out: dict[int, tuple[float, float]] = {}
     for t in months:
         def raws(signals: list[Signal]) -> list[tuple[Signal, dict[int, float]]]:
             pairs = []
@@ -150,5 +150,17 @@ def probs_series(
         iz = composite_at(raws(INFLATION_SIGNALS), t, MIN_SIGNALS["inflation"], mode)
         if gz is None or iz is None:
             continue
-        out[t] = quadrant_probs(gz, iz)
+        out[t] = (gz, iz)
     return out
+
+
+def probs_series(
+    metric_series: dict[str, dict[int, float]],
+    months: list[int],
+    mode: str,
+    known_at: dict[str, "callable"] | None = None,
+) -> dict[int, dict[str, float]]:
+    """Quadrant probabilities per decision month (unsmoothed, matching the
+    regimeHistory convention the track record compounds on)."""
+    comps = composites_series(metric_series, months, mode, known_at)
+    return {t: quadrant_probs(gz, iz) for t, (gz, iz) in comps.items()}

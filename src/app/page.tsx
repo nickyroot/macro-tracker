@@ -2,6 +2,7 @@ import { GlobalPanel } from "@/components/global-panel";
 import { MetricCard } from "@/components/metric-card";
 import { PortfolioPanel } from "@/components/portfolio-panel";
 import { RecessionPanel } from "@/components/recession-panel";
+import { RegimeForecastPanel } from "@/components/regime-forecast-panel";
 import { TrackRecordPanel } from "@/components/track-record-panel";
 import { TimelinePanel } from "@/components/timeline-panel";
 import { getDashboardData } from "@/lib/dashboard";
@@ -43,6 +44,8 @@ export default async function Home() {
       {trackRecord && <TrackRecordPanel track={trackRecord} />}
 
       {ml && <RecessionPanel ml={ml} recessions={timeline.recessions} />}
+
+      {ml?.regimeNext && <RegimeForecastPanel forecast={ml.regimeNext} />}
 
       {timeline.metrics.length > 0 && <TimelinePanel timeline={timeline} />}
 
